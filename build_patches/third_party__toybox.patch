@@ -1,3 +1,20 @@
+Patch: third_party/toybox — всегда отключать два предупреждения для toybox
+Зачем:
+  В BUILD.gn флаги -Wno-unused-function и -Wno-misleading-indentation
+  добавляются только при support_jsapi == false. В стандартной системе
+  support_jsapi == true (берётся из конфига продукта, см.
+  build/config/BUILDCONFIG.gn:239), флаги не добавляются, и сборка с
+  -Werror падает:
+    toys/pending/mdev.c:237  error: misleading indentation [-Wmisleading-indentation]
+    toys/posix/id.c:104      error: unused function 'oh_getpwuid' [-Wunused-function]
+Почему не через конфиг:
+  support_jsapi = false в конфиге продукта убирает импорт шаблонов
+  (ohos_app и др.) в build/ohos.gni, и gn падает на других компонентах
+  (например base/telephony/telephony_data).
+Применение: P=$PWD/oneir_patches/build_patches/third_party__toybox.patch
+            git -C third_party/toybox apply --check "$P" && git -C third_party/toybox apply "$P"
+Откат:      git -C third_party/toybox apply --reverse tests/patches/third_party__toybox.patch
+
 diff --git a/BUILD.gn b/BUILD.gn
 index cc19b81..91f8604 100644
 --- a/BUILD.gn
