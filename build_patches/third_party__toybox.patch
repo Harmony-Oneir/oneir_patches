@@ -14,7 +14,8 @@ Patch: third_party/toybox — всегда отключать два преду�
   (ohos_app и др.) в build/ohos.gni, и gn падает на других компонентах
   (например base/telephony/telephony_data).
 
-Применение: git -C third_party/toybox status --short BUILD.gn
+Применение: P=$PWD/oneir_patches/build_patches/third_party__toybox.patch
+            git -C third_party/toybox apply --check "$P" && git -C third_party/toybox apply "$P"
 Откат:      git -C third_party/toybox apply --reverse tests/patches/third_party__toybox.patch
 
 diff --git a/BUILD.gn b/BUILD.gn
