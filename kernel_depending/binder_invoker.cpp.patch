@@ -1,0 +1,179 @@
+ipc/binder_invoker: токен отправителя без модуля ядра access_token_id
+Парный патч к token_setproc-no-tokenid.patch (тот пишет bypid/<pid>).
+Если ядро не передаёт токены в binder (нет SenderInfo и AccessToken):
+  - LookupTokenByPid(pid): bypid/<pid>, иначе byname/<имя из /proc/<pid>/cmdline>;
+  - Transaction: токен вызывающего ищется по callerPid_; если не найден
+    (например, oneway-вызов, pid = 0) — берётся токен самого получателя;
+    firstTokenID_ = callerTokenID_;
+  - GetSelfTokenID / GetSelfFirstCallerTokenID: вместо uid — свой токен
+    из bypid/byname, uid только если записи нет.
+Ограничение: при неизвестном отправителе вызов проверяется с правами
+получателя, а pid может достаться новому процессу — чистите bypid/
+перед запуском стенда.
+Применить (из корня дерева OpenHarmony):
+  git -C foundation/communication/ipc apply --check ../../../binder_invoker-no-tokenid.patch
+  git -C foundation/communication/ipc apply ../../../binder_invoker-no-tokenid.patch
+  или: patch -d foundation/communication/ipc -p1 < binder_invoker-no-tokenid.patch
+Откатить:
+  git -C foundation/communication/ipc apply -R ../../../binder_invoker-no-tokenid.patch
+  или: git -C foundation/communication/ipc checkout -- ipc/native/src/core/invoker/source/binder_invoker.cpp
+
+diff --git a/ipc/native/src/core/invoker/source/binder_invoker.cpp b/ipc/native/src/core/invoker/source/binder_invoker.cpp
+index b1fcadbc..9e29eaaa 100644
+--- a/ipc/native/src/core/invoker/source/binder_invoker.cpp
++++ b/ipc/native/src/core/invoker/source/binder_invoker.cpp
+@@ -978,6 +978,59 @@ int32_t BinderInvoker::TargetStubSendRequest(const binder_transaction_data &tr,
+     return error;
+ }
+ 
++
++static uint64_t LookupTokenByPid(pid_t pid)
++{
++
++
++    char pidPath[256];
++    if (snprintf(pidPath, sizeof(pidPath),
++                 "/data/service/el0/access_token/bypid/%d", (int)pid) > 0) {
++        FILE *file = fopen(pidPath, "r");
++        if (file != nullptr) {
++            unsigned long long value = 0;
++            int cnt = fscanf(file, "%llu", &value);
++            (void)fclose(file);
++            if (cnt == 1 && value != 0) {
++                return static_cast<uint64_t>(value);
++            }
++        }
++    }
++
++
++    char path[64] = {0};
++    if (snprintf(path, sizeof(path), "/proc/%d/cmdline", pid) < 0) {
++        return 0;
++    }
++    FILE *f = fopen(path, "r");
++    if (f == nullptr) {
++        return 0;
++    }
++    char cmdline[256] = {0};
++    size_t n = fread(cmdline, 1, sizeof(cmdline) - 1, f);
++    fclose(f);
++    if (n == 0) {
++        return 0;
++    }
++    // В cmdline аргументы разделены нулями, первый из них — путь к бинарнику.
++    const char *slash = strrchr(cmdline, '/');
++    const char *name = (slash != nullptr) ? slash + 1 : cmdline;
++
++    char tokenPath[320] = {0};
++    if (snprintf(tokenPath, sizeof(tokenPath),
++                 "/data/service/el0/access_token/byname/%s", name) < 0) {
++        return 0;
++    }
++    f = fopen(tokenPath, "r");
++    if (f == nullptr) {
++        return 0;
++    }
++    unsigned long long token = 0;
++    int matched = fscanf(f, "%llu", &token);
++    fclose(f);
++    return (matched == 1) ? static_cast<uint64_t>(token) : 0;
++}
++
+ void BinderInvoker::Transaction(binder_transaction_data_secctx& trSecctx)
+ {
+     binder_transaction_data& tr = trSecctx.transaction_data;
+@@ -1019,7 +1072,47 @@ void BinderInvoker::Transaction(binder_transaction_data_secctx& trSecctx)
+         GetSenderInfo(callerTokenID_, firstTokenID_, callerRealPid_);
+     } else if (binderConnector_ != nullptr && binderConnector_->IsAccessTokenSupported()) {
+         GetAccessToken(callerTokenID_, firstTokenID_);
++    }else{
++        // The OpenHarmony kernel without extensions does not pass the sender's token:
++        // there is neither an `access_token_id` module nor corresponding fields in Binder.
++        // There is also no ATM service in the system, and no one issues HAP tokens,
++        // so all processes here are native. We retrieve the correct
++        // native process identifier: version 1, type 1, number based on the UID.
++       //constexpr uint64_t TOKEN_VERSION_SHIFT = 29;
++       // constexpr uint64_t TOKEN_TYPE_SHIFT = 27;
++       // constexpr uint64_t TOKEN_TYPE_NATIVE = 1;
++       // constexpr uint64_t TOKEN_VERSION = 1; // version, default 001
++       // constexpr uint64_t TOKEN_UNIQUE_MASK = 0xfffff;
++       // callerTokenID_ = (TOKEN_VERSION << TOKEN_VERSION_SHIFT) | (TOKEN_TYPE_NATIVE << TOKEN_TYPE_SHIFT) | (static_cast<uint64_t>(callerUid_) & TOKEN_UNIQUE_MASK);
++       // firstTokenID_ = callerTokenID_;
++      // Ядро без модуля access_token_id не передаёт токен отправителя.
++        // Восстанавливаем его сами: pid приходит от binder и подделке не
++        // поддаётся, имя процесса по pid даёт ядро через /proc, а
++        // соответствие имени и токена ведёт libnativetoken.
++        callerTokenID_ = LookupTokenByPid(callerPid_);
++        if (callerTokenID_ == 0) {
++            // Ядро не передало ни маркера, ни номера процесса отправителя.
++            // Все процессы на этом стенде нативные, поэтому собираем маркер
++            // нужного вида из номера пользователя: версия 1, тип 1 (нативный).
++            //constexpr uint64_t TOKEN_VERSION_SHIFT = 29;
++            //constexpr uint64_t TOKEN_TYPE_SHIFT = 27;
++            //constexpr uint64_t TOKEN_UNIQUE_MASK = 0xfffff;
++            //callerTokenID_ = (1ULL << TOKEN_VERSION_SHIFT) | (1ULL << TOKEN_TYPE_SHIFT) |
++            //                 (static_cast<uint64_t>(callerUid_) & TOKEN_UNIQUE_MASK);
++       // Односторонняя посылка: ядро не сообщает отправителя.
++            // Берём маркер принимающего процесса — он настоящий и
++            // зарегистрирован, в отличие от собранного из номера пользователя.
++            callerTokenID_ = LookupTokenByPid(getpid());
++
++        }
++
++        firstTokenID_ = callerTokenID_;
++
+     }
++
++
++
++
+     // sync caller information to another binderinvoker
+     AttachInvokerProcInfoWrapper();
+     MessageParcel reply;
+@@ -1099,6 +1192,10 @@ void BinderInvoker::OnSpawnThread()
+ }
+ // LCOV_EXCL_STOP
+ 
++
++
++
++
+ void BinderInvoker::OnTransaction(uint32_t cmd, int32_t &error)
+ {
+     binder_transaction_data_secctx trSecctx = {
+@@ -1660,7 +1757,18 @@ uint64_t BinderInvoker::GetSelfTokenID() const
+         return 0;
+     }
+     uint64_t selfTokenId = binderConnector_->GetSelfTokenID();
+-    return (selfTokenId == 0) ? static_cast<uint64_t>(getuid()) : selfTokenId;
++    //return (selfTokenId == 0) ? static_cast<uint64_t>(getuid()) : selfTokenId;
++        if (selfTokenId != 0) {
++        return selfTokenId;
++    }
++
++    // Ядро без поддержки токенов возвращает ноль. Апстрим подставляет здесь
++    // uid, но он неотличим от токена приложения и ломает проверку типа.
++    // Берём настоящий токен процесса из той же таблицы, что и для отправителя.
++    uint64_t token = LookupTokenByPid(getpid());
++    return (token != 0) ? token : static_cast<uint64_t>(getuid());
++
++
+ }
+ // LCOV_EXCL_STOP
+ 
+@@ -1671,7 +1779,14 @@ uint64_t BinderInvoker::GetSelfFirstCallerTokenID() const
+         return 0;
+     }
+     uint64_t selfFirstCallerTokenId = binderConnector_->GetSelfFirstCallerTokenID();
+-    return (selfFirstCallerTokenId == 0) ? static_cast<uint32_t>(getuid()) : selfFirstCallerTokenId;
++   // return (selfFirstCallerTokenId == 0) ? static_cast<uint32_t>(getuid()) : selfFirstCallerTokenId;
++
++if (selfFirstCallerTokenId != 0) {
++        return selfFirstCallerTokenId;
++    }
++    uint64_t token = LookupTokenByPid(getpid());
++    return (token != 0) ? token : static_cast<uint64_t>(getuid());
++
+ }
+ // LCOV_EXCL_STOP
+ 
