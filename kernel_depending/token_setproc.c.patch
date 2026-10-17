@@ -1,0 +1,232 @@
+token_setproc: работа без модуля ядра access_token_id
+Без /dev/access_token_id функции не возвращают ошибку, а хранят токен сами:
+  - в памяти процесса (g_selfTokenId, g_firstTokenId);
+  - в /data/service/el0/access_token/bypid/<pid> — оттуда токен отправителя
+    читает binder_invoker (нужен парный патч в foundation/communication/ipc);
+  - в /data/service/el0/access_token/byname/<имя> — токены служб, файлы
+    раскладывает token_init.
+Применить (из корня дерева OpenHarmony):
+  P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_depending/token_setproc.c.patch
+  git -C base/security/access_token apply --check -p4 "$P" 
+Откатить:
+  git -C base/security/access_token restore -- interfaces/innerkits/token_setproc/src/token_setproc.c
+
+--- a/base/security/access_token/interfaces/innerkits/token_setproc/src/token_setproc.c
++++ b/base/security/access_token/interfaces/innerkits/token_setproc/src/token_setproc.c
+@@ -22,6 +22,11 @@
+ #include <sys/ioctl.h>
+ #include <unistd.h>
+ 
++#include <stdatomic.h>
++#include <string.h>
++#include <sys/stat.h>
++
++
+ #define    ACCESS_TOKENID_GET_TOKENID \
+     _IOR(ACCESS_TOKEN_ID_IOCTL_BASE, GET_TOKEN_ID, uint64_t)
+ #define    ACCESS_TOKENID_SET_TOKENID \
+@@ -43,6 +48,105 @@
+ 
+ const uint64_t SET_PROC_FD_TAG = 0xD005A01;
+ 
++
++/*
++ * Ядро без модуля access_token_id: устройства TOKENID_DEVNODE нет.
++ * Эти значения принадлежат самому процессу, поэтому храним их у себя.
++ * Наружу токен уходит не отсюда, а через binder.
++ */
++static _Atomic uint64_t g_selfTokenId = INVAL_TOKEN_ID;
++static _Atomic uint64_t g_firstTokenId = INVAL_TOKEN_ID;
++
++
++
++
++#define TOKEN_BY_NAME_DIR "/data/service/el0/access_token/byname/"
++
++/*
++ * Ядро без модуля access_token_id не хранит токен в задаче, поэтому init
++ * не может выставить его процессу при запуске. Читаем свой токен из файла,
++ * который создаёт token_init, — по имени процесса. Тот же приём, что и в
++ * binder_invoker для токена отправителя.
++ */
++static uint64_t LoadSelfTokenByName(void)
++{
++    char cmdline[256] = {0};
++    int fd = open("/proc/self/cmdline", O_RDONLY);
++    if (fd < 0) {
++        return INVAL_TOKEN_ID;
++    }
++    ssize_t len = read(fd, cmdline, sizeof(cmdline) - 1);
++    (void)close(fd);
++    if (len <= 0) {
++        return INVAL_TOKEN_ID;
++    }
++    cmdline[len] = '\0';
++
++    char *name = strrchr(cmdline, '/');
++    name = (name != NULL) ? (name + 1) : cmdline;
++
++    char path[512];
++    if (snprintf(path, sizeof(path), "%s%s", TOKEN_BY_NAME_DIR, name) < 0) {
++        return INVAL_TOKEN_ID;
++    }
++
++    FILE *file = fopen(path, "r");
++    if (file == NULL) {
++        return INVAL_TOKEN_ID;
++    }
++    unsigned long long value = 0;
++    int cnt = fscanf(file, "%llu", &value);
++    (void)fclose(file);
++    if (cnt != 1) {
++        return INVAL_TOKEN_ID;
++    }
++    return (uint64_t)value;
++}
++
++#define TOKEN_BY_PID_DIR "/data/service/el0/access_token/bypid/"
++
++/*
++ * Ядро не хранит токен в задаче, поэтому получатель транзакции binder не может
++ * узнать токен отправителя. Процесс оставляет запись о себе по своему
++ * идентификатору; её читает binder_invoker при разборе входящей транзакции.
++ */
++static void StoreSelfTokenByPid(uint64_t tokenID)
++{
++    char path[256];
++    if (tokenID == INVAL_TOKEN_ID) {
++        return;
++    }
++    if (snprintf(path, sizeof(path), "%s%d", TOKEN_BY_PID_DIR, (int)getpid()) < 0) {
++        return;
++    }
++    FILE *file = fopen(path, "w");
++    if (file == NULL) {
++        return;
++    }
++    (void)fprintf(file, "%llu", (unsigned long long)tokenID);
++    (void)fclose(file);
++    (void)chmod(path, 0644);
++}
++
++static uint64_t LoadSelfTokenByPid(void)
++{
++    char path[256];
++    if (snprintf(path, sizeof(path), "%s%d", TOKEN_BY_PID_DIR, (int)getpid()) < 0) {
++        return INVAL_TOKEN_ID;
++    }
++    FILE *file = fopen(path, "r");
++    if (file == NULL) {
++        return INVAL_TOKEN_ID;
++    }
++    unsigned long long value = 0;
++    int cnt = fscanf(file, "%llu", &value);
++    (void)fclose(file);
++    if (cnt != 1 || value == 0) {
++        return INVAL_TOKEN_ID;
++    }
++    return (uint64_t)value;
++}
++
+ int32_t GetParentHapTokenID(uint32_t bin, uint64_t *parent)
+ {
+     if (bin == INVAL_TOKEN_ID || parent == NULL) {
+@@ -74,9 +178,44 @@
+ {
+     uint64_t token = INVAL_TOKEN_ID;
+     int fd = open(TOKENID_DEVNODE, O_RDWR);
++    //if (fd < 0) {
++    //    return INVAL_TOKEN_ID;
++    //}
++
++    //if (fd < 0) {
++    //    return atomic_load(&g_selfTokenId);
++    //}
++
++    //if (fd < 0) {
++    //    token = atomic_load(&g_selfTokenId);
++       
++    //    if (token == INVAL_TOKEN_ID) {
++    //        token = LoadSelfTokenByName();
++
++
++      //      atomic_store(&g_selfTokenId, token);
++
++      //     StoreSelfTokenByPid(token);
++     //   }
++     //   return token;
++   // }
++
+     if (fd < 0) {
+-        return INVAL_TOKEN_ID;
++        token = atomic_load(&g_selfTokenId);
++        if (token == INVAL_TOKEN_ID) {
++            /* Сначала — файл по номеру процесса: его записал тот, кто выставлял
++             * маркер при запуске, и там лежит полное 64-битное значение.
++             * Поиск по имени оставляем как запасной для системных служб. */
++            token = LoadSelfTokenByPid();
++            if (token == INVAL_TOKEN_ID) {
++                token = LoadSelfTokenByName();
++                StoreSelfTokenByPid(token);
++            }
++            atomic_store(&g_selfTokenId, token);
++        }
++        return token;
+     }
++
+     fdsan_exchange_owner_tag(fd, 0, SET_PROC_FD_TAG);
+     int ret = ioctl(fd, ACCESS_TOKENID_GET_TOKENID, &token);
+     if (ret) {
+@@ -91,9 +230,17 @@
+ int SetSelfTokenID(uint64_t tokenID)
+ {
+     int fd = open(TOKENID_DEVNODE, O_RDWR);
++    //if (fd < 0) {
++    //    return ACCESS_TOKEN_OPEN_ERROR;
++    // }
++
+     if (fd < 0) {
+-        return ACCESS_TOKEN_OPEN_ERROR;
++        atomic_store(&g_selfTokenId, tokenID);
++        StoreSelfTokenByPid(tokenID);
++        return ACCESS_TOKEN_OK;
+     }
++
++
+     fdsan_exchange_owner_tag(fd, 0, SET_PROC_FD_TAG);
+     int ret = ioctl(fd, ACCESS_TOKENID_SET_TOKENID, &tokenID);
+     if (ret) {
+@@ -109,9 +256,15 @@
+ {
+     uint64_t token = INVAL_TOKEN_ID;
+     int fd = open(TOKENID_DEVNODE, O_RDWR);
++    //if (fd < 0) {
++    //    return INVAL_TOKEN_ID;
++    // }
++
+     if (fd < 0) {
+-        return INVAL_TOKEN_ID;
++        return atomic_load(&g_firstTokenId);
+     }
++
++
+     fdsan_exchange_owner_tag(fd, 0, SET_PROC_FD_TAG);
+     int ret = ioctl(fd, ACCESS_TOKENID_GET_FTOKENID, &token);
+     if (ret) {
+@@ -126,9 +279,15 @@
+ int SetFirstCallerTokenID(uint64_t tokenID)
+ {
+     int fd = open(TOKENID_DEVNODE, O_RDWR);
++    //if (fd < 0) {
++    //    return ACCESS_TOKEN_OPEN_ERROR;
++    //}
++
+     if (fd < 0) {
+-        return ACCESS_TOKEN_OPEN_ERROR;
++        atomic_store(&g_firstTokenId, tokenID);
++        return ACCESS_TOKEN_OK;
+     }
++
+     fdsan_exchange_owner_tag(fd, 0, SET_PROC_FD_TAG);
+     int ret = ioctl(fd, ACCESS_TOKENID_SET_FTOKENID, &tokenID);
+     if (ret) {
