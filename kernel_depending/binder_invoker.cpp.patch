@@ -11,12 +11,11 @@ ipc/binder_invoker: токен отправителя без модуля ядр
 получателя, а pid может достаться новому процессу — чистите bypid/
 перед запуском стенда.
 Применить (из корня дерева OpenHarmony):
-  git -C foundation/communication/ipc apply --check ../../../binder_invoker-no-tokenid.patch
-  git -C foundation/communication/ipc apply ../../../binder_invoker-no-tokenid.patch
-  или: patch -d foundation/communication/ipc -p1 < binder_invoker-no-tokenid.patch
+  P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_depending/binder_invoker.cpp.patch
+  git -C foundation/communication/ipc apply --check "$P"
+  git -C foundation/communication/ipc apply "$P"
 Откатить:
-  git -C foundation/communication/ipc apply -R ../../../binder_invoker-no-tokenid.patch
-  или: git -C foundation/communication/ipc checkout -- ipc/native/src/core/invoker/source/binder_invoker.cpp
+  git -C foundation/communication/ipc restore -- ipc/native/src/core/invoker/source/binder_invoker.cpp
 
 diff --git a/ipc/native/src/core/invoker/source/binder_invoker.cpp b/ipc/native/src/core/invoker/source/binder_invoker.cpp
 index b1fcadbc..9e29eaaa 100644
