@@ -1,19 +1,7 @@
-token_setproc: работа без модуля ядра access_token_id
-Без /dev/access_token_id функции не возвращают ошибку, а хранят токен сами:
-  - в памяти процесса (g_selfTokenId, g_firstTokenId);
-  - в /data/service/el0/access_token/bypid/<pid> — оттуда токен отправителя
-    читает binder_invoker (нужен парный патч в foundation/communication/ipc);
-  - в /data/service/el0/access_token/byname/<имя> — токены служб, файлы
-    раскладывает token_init.
-Применить (из корня дерева OpenHarmony):
-  P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_depending/token_setproc.c.patch
-  git -C base/security/access_token apply --check -p4 "$P"
-  git -C base/security/access_token apply -p4 "$P" 
-Откатить:
-  git -C base/security/access_token restore -- interfaces/innerkits/token_setproc/src/token_setproc.c
-
---- a/base/security/access_token/interfaces/innerkits/token_setproc/src/token_setproc.c
-+++ b/base/security/access_token/interfaces/innerkits/token_setproc/src/token_setproc.c
+diff --git a/interfaces/innerkits/token_setproc/src/token_setproc.c b/interfaces/innerkits/token_setproc/src/token_setproc.c
+index 3e5dd6674..723ee91ee 100644
+--- a/interfaces/innerkits/token_setproc/src/token_setproc.c
++++ b/interfaces/innerkits/token_setproc/src/token_setproc.c
 @@ -22,6 +22,11 @@
  #include <sys/ioctl.h>
  #include <unistd.h>
@@ -26,7 +14,7 @@ token_setproc: работа без модуля ядра access_token_id
  #define    ACCESS_TOKENID_GET_TOKENID \
      _IOR(ACCESS_TOKEN_ID_IOCTL_BASE, GET_TOKEN_ID, uint64_t)
  #define    ACCESS_TOKENID_SET_TOKENID \
-@@ -43,6 +48,105 @@
+@@ -43,6 +48,105 @@ struct access_token_hap_query_op {
  
  const uint64_t SET_PROC_FD_TAG = 0xD005A01;
  
@@ -132,7 +120,7 @@ token_setproc: работа без модуля ядра access_token_id
  int32_t GetParentHapTokenID(uint32_t bin, uint64_t *parent)
  {
      if (bin == INVAL_TOKEN_ID || parent == NULL) {
-@@ -74,9 +178,44 @@
+@@ -74,9 +178,44 @@ uint64_t GetSelfTokenID(void)
  {
      uint64_t token = INVAL_TOKEN_ID;
      int fd = open(TOKENID_DEVNODE, O_RDWR);
@@ -178,7 +166,7 @@ token_setproc: работа без модуля ядра access_token_id
      fdsan_exchange_owner_tag(fd, 0, SET_PROC_FD_TAG);
      int ret = ioctl(fd, ACCESS_TOKENID_GET_TOKENID, &token);
      if (ret) {
-@@ -91,9 +230,17 @@
+@@ -91,9 +230,17 @@ uint64_t GetSelfTokenID(void)
  int SetSelfTokenID(uint64_t tokenID)
  {
      int fd = open(TOKENID_DEVNODE, O_RDWR);
@@ -197,7 +185,7 @@ token_setproc: работа без модуля ядра access_token_id
      fdsan_exchange_owner_tag(fd, 0, SET_PROC_FD_TAG);
      int ret = ioctl(fd, ACCESS_TOKENID_SET_TOKENID, &tokenID);
      if (ret) {
-@@ -109,9 +256,15 @@
+@@ -109,9 +256,15 @@ uint64_t GetFirstCallerTokenID(void)
  {
      uint64_t token = INVAL_TOKEN_ID;
      int fd = open(TOKENID_DEVNODE, O_RDWR);
@@ -214,7 +202,7 @@ token_setproc: работа без модуля ядра access_token_id
      fdsan_exchange_owner_tag(fd, 0, SET_PROC_FD_TAG);
      int ret = ioctl(fd, ACCESS_TOKENID_GET_FTOKENID, &token);
      if (ret) {
-@@ -126,9 +279,15 @@
+@@ -126,9 +279,15 @@ uint64_t GetFirstCallerTokenID(void)
  int SetFirstCallerTokenID(uint64_t tokenID)
  {
      int fd = open(TOKENID_DEVNODE, O_RDWR);
