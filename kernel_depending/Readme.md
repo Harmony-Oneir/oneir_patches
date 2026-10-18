@@ -1,4 +1,4 @@
-**token_setproc**: работа без модуля ядра access_token_id
+**token_setproc.c.patch**: работа без модуля ядра access_token_id
 
 Без `/dev/access_token_id` функции не возвращают ошибку, а хранят токен сами:
   - в памяти процесса (g_selfTokenId, g_firstTokenId);
