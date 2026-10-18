@@ -9,8 +9,11 @@
     
 Применить (из корня дерева OpenHarmony):
   * `P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_depending/token_setproc.c.patch`
-  * `git -C base/security/access_token apply --check -p4 "$P"`
-  * `git -C base/security/access_token apply -p4 "$P"`
+  * `git -C base/security/access_token apply --check "$P"`
+  * `git -C base/security/access_token apply "$P"`
 
 Откатить:
   * `git -C base/security/access_token restore -- interfaces/innerkits/token_setproc/src/token_setproc.c`
+
+Проверить:
+  * `git -C base/security/access_token status --short`
