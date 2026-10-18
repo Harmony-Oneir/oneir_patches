@@ -38,5 +38,6 @@
   * `P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_depending/binder_invoker.cpp.patch`
   * `git -C foundation/communication/ipc apply --check "$P"`
   * `git -C foundation/communication/ipc apply "$P"`
+    
 Откатить:
   * `git -C foundation/communication/ipc restore -- ipc/native/src/core/invoker/source/binder_invoker.cpp`
