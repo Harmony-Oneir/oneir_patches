@@ -17,3 +17,26 @@
 
 Проверить:
   * `git -C base/security/access_token status --short`
+
+---
+
+**binder_invoker.cpp.patch**: токен отправителя без модуля ядра access_token_id
+Парный патч к token_setproc-no-tokenid.patch (тот пишет `bypid/<pid>`).
+Если ядро не передаёт токены в binder (нет `SenderInfo` и `AccessToken`):
+  - LookupTokenByPid(pid): bypid/<pid>, иначе `byname/<имя из /proc/<pid>/cmdline>`;
+  - Transaction: токен вызывающего ищется по `callerPid_;` если не найден
+    (например, oneway-вызов, pid = 0) — берётся токен самого получателя;
+    firstTokenID_ = callerTokenID_;
+  - GetSelfTokenID / GetSelfFirstCallerTokenID: вместо uid — свой токен
+    из bypid/byname, uid только если записи нет.
+    
+Ограничение: при неизвестном отправителе вызов проверяется с правами
+получателя, а pid может достаться новому процессу — чистите `bypid/`
+перед запуском стенда.
+
+Применить (из корня дерева OpenHarmony):
+  * `P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_depending/binder_invoker.cpp.patch`
+  * `git -C foundation/communication/ipc apply --check "$P"`
+  * `git -C foundation/communication/ipc apply "$P"`
+Откатить:
+  * `git -C foundation/communication/ipc restore -- ipc/native/src/core/invoker/source/binder_invoker.cpp`
