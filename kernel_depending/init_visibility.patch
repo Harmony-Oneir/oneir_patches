@@ -1,0 +1,114 @@
+diff --git a/interfaces/innerkits/BUILD.gn b/interfaces/innerkits/BUILD.gn
+index 2a431657..2ecff587 100755
+--- a/interfaces/innerkits/BUILD.gn
++++ b/interfaces/innerkits/BUILD.gn
+@@ -21,7 +21,8 @@ if (!defined(ohos_lite) || init_feature_begetctl_liteos) {
+ }
+ 
+ config("exported_header_files") {
+-  visibility = [ ":*" ]
++  visibility = [
++    "//oneir/*", ":*" ]
+   include_dirs = [
+     "//base/startup/init/interfaces/innerkits/include",
+     "//base/startup/init/interfaces/innerkits/include/syspara",
+diff --git a/services/log/BUILD.gn b/services/log/BUILD.gn
+index 4adad07d..63e9fa26 100644
+--- a/services/log/BUILD.gn
++++ b/services/log/BUILD.gn
+@@ -13,7 +13,8 @@
+ base_sources = [ "init_log.c" ]
+ 
+ config("exported_header_files") {
+-  visibility = [ ":*" ]
++  visibility = [
++    "//oneir/*", ":*" ]
+   include_dirs = [
+     "//base/startup/init/interfaces/innerkits/include",
+     "//base/startup/init/services/log",
+@@ -24,6 +25,7 @@ config("exported_header_files") {
+ if (defined(ohos_lite)) {
+   static_library("init_log") {
+     visibility = [
++    "//oneir/*",
+       ":*",
+       "//base/startup/init/*",
+       "//out/*",
+@@ -49,6 +51,7 @@ if (defined(ohos_lite)) {
+   ohos_static_library("init_log") {
+     branch_protector_ret = "pac_ret"
+     visibility = [
++    "//oneir/*",
+       ":*",
+       "//base/startup/init/*",
+       "//out/*",
+diff --git a/services/param/base/BUILD.gn b/services/param/base/BUILD.gn
+index 44605f3f..68e6a7af 100644
+--- a/services/param/base/BUILD.gn
++++ b/services/param/base/BUILD.gn
+@@ -14,7 +14,8 @@ import("//base/startup/init/begetd.gni")
+ import("//build/ohos.gni")
+ 
+ config("exported_header_files") {
+-  visibility = [ ":*" ]
++  visibility = [
++    "//oneir/*", ":*" ]
+   include_dirs = [
+     "//base/startup/init/interfaces/innerkits/include",
+     "//base/startup/init/interfaces/innerkits/include/param",
+@@ -26,7 +27,8 @@ config("exported_header_files") {
+ }
+ 
+ config("exported_header_files_for_lite") {
+-  visibility = [ ":*" ]
++  visibility = [
++    "//oneir/*", ":*" ]
+   include_dirs = [ "//base/hiviewdfx/hilog_lite/interfaces/native/kits" ]
+ }
+ 
+@@ -136,6 +138,7 @@ template("lib_parameterbase_template") {
+     ohos_static_library(target_name) {
+       branch_protector_ret = "pac_ret"
+       visibility = [
++    "//oneir/*",
+         ":*",
+         "//third_party/musl/*",
+         "//out/*"
+diff --git a/services/param/linux/BUILD.gn b/services/param/linux/BUILD.gn
+index f122b7a2..569c424d 100755
+--- a/services/param/linux/BUILD.gn
++++ b/services/param/linux/BUILD.gn
+@@ -14,7 +14,8 @@ import("//base/startup/init/begetd.gni")
+ import("//build/ohos.gni")
+ 
+ config("exported_header_files") {
+-  visibility = [ ":*" ]
++  visibility = [
++    "//oneir/*", ":*" ]
+   include_dirs = [
+     "//base/startup/init/interfaces/innerkits/include",
+     "//base/startup/init/interfaces/interfaces/innerkits/include/param",
+@@ -23,7 +24,8 @@ config("exported_header_files") {
+ }
+ 
+ config("exported_header_files_for_lite") {
+-  visibility = [ ":*" ]
++  visibility = [
++    "//oneir/*", ":*" ]
+ }
+ 
+ param_include_dirs = [
+diff --git a/services/utils/BUILD.gn b/services/utils/BUILD.gn
+index 9b455001..ffcd1642 100755
+--- a/services/utils/BUILD.gn
++++ b/services/utils/BUILD.gn
+@@ -12,7 +12,8 @@
+ # limitations under the License.
+ import("//base/startup/init/begetd.gni")
+ config("exported_header_files") {
+-  visibility = [ ":*" ]
++  visibility = [
++    "//oneir/*", ":*" ]
+   include_dirs = [
+     "//base/startup/init/interfaces/innerkits/include",
+     "//base/startup/init/services/log",
