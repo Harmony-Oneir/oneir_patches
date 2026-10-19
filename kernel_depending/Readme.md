@@ -41,3 +41,15 @@
     
 Откатить:
   * `git -C foundation/communication/ipc restore -- ipc/native/src/core/invoker/source/binder_invoker.cpp`
+
+---
+
+**init_visibility.patch**: Патч `init_visibility.patch` расширяет списки видимости в файлах `BUILD.gn` модуля `base/startup/init`, добавляя в них шаблон `//oneir/*`. Без него GN запрещает целям из каталога oneir зависеть от внутренних библиотек init (`init_log`, `param_base`, `param_init`, `libinit_utils`, `libbegetutil`), которые по умолчанию доступны только самому модулю init, и сборка собственного сервиса параметров `oneir_param_service` падает с ошибкой `Dependency not allowed` ещё на этапе gn gen. Патч не меняет ни исходный код, ни поведение init: он только разрешает системе сборки использовать эти цели из `//oneir`, поэтому на остальную систему никак не влияет и безопасен при повторном применении к чистому дереву.
+
+Применить (из корня дерева OpenHarmony):
+  * `P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_depending/init_visibility.patch`
+  * `git -C base/startup/init apply --check "$P"`
+  * `git -C base/startup/init apply "$P"`
+
+Откатить:
+  * `git -C base/startup/init restore -- services/log/BUILD.gn services/param/base/BUILD.gn services/param/linux/BUILD.gn services/utils/BUILD.gn interfaces/innerkits/BUILD.gn`
