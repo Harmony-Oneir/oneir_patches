@@ -1,0 +1,22 @@
+diff --git a/src/util/u_mm.c b/src/util/u_mm.c
+index f77f6f40c96..e20233b729f 100644
+--- a/src/util/u_mm.c
++++ b/src/util/u_mm.c
+@@ -29,7 +29,7 @@
+ #include "util/u_mm.h"
+ #include "util/macros.h"
+ #include "util/detect_os.h"
+-#if DETECT_OS_OHOS
++#if DETECT_OS_OHOS && (defined(__aarch64__) || defined(__ARM_NEON))
+ #include <arm_neon.h>
+ #endif
+ 
+@@ -304,7 +304,7 @@ u_mmDestroy(struct mem_block *heap)
+ void
+ memcpy_neon(void *dst, const void* src, size_t size)
+ {
+-#if DETECT_OS_OHOS
++#if DETECT_OS_OHOS && (defined(__aarch64__) || defined(__ARM_NEON))
+    unsigned char* dst0 = (unsigned char*) dst;
+    const unsigned char* src0 = (const unsigned char*) src;
+    if (dst0 == NULL || src0 == NULL) {
