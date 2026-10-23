@@ -1,0 +1,26 @@
+diff --git a/src/vulkan/meson.build b/src/vulkan/meson.build
+index 3225b5f4a9d..dae59b6f386 100644
+--- a/src/vulkan/meson.build
++++ b/src/vulkan/meson.build
+@@ -54,7 +54,7 @@ if with_platform_wayland
+   vulkan_wsi_deps += dep_wayland_client
+   vulkan_wsi_list += '-DVK_USE_PLATFORM_WAYLAND_KHR'
+ endif
+-if system_has_kms_drm and not with_platform_android
++if system_has_kms_drm and not with_platform_android and not with_platform_ohos
+   vulkan_wsi_deps += [dep_libdrm]
+   vulkan_wsi_list += '-DVK_USE_PLATFORM_DISPLAY_KHR'
+ endif
+diff --git a/src/vulkan/wsi/meson.build b/src/vulkan/wsi/meson.build
+index 6933eb780c4..28256853a5e 100644
+--- a/src/vulkan/wsi/meson.build
++++ b/src/vulkan/wsi/meson.build
+@@ -35,7 +35,7 @@ if with_platform_macos
+   files_vulkan_wsi += files('wsi_common_metal.c', 'wsi_common_metal_layer.m')
+ endif
+ 
+-if system_has_kms_drm and not with_platform_android
++if system_has_kms_drm and not with_platform_android and not with_platform_ohos
+   files_vulkan_wsi += files('wsi_common_display.c')
+ endif
+ 
