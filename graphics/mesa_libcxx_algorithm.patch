@@ -1,0 +1,12 @@
+diff --git a/src/intel/compiler/brw_compile_fs.cpp b/src/intel/compiler/brw_compile_fs.cpp
+index 31d9e312139..c129e95c287 100644
+--- a/src/intel/compiler/brw_compile_fs.cpp
++++ b/src/intel/compiler/brw_compile_fs.cpp
+@@ -3,6 +3,7 @@
+  * SPDX-License-Identifier: MIT
+  */
+ 
++#include <algorithm>
+ #include "brw_eu.h"
+ #include "brw_fs.h"
+ #include "brw_builder.h"
