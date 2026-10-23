@@ -7,3 +7,16 @@
 
 Откатить:
 * `git -C third_party/mesa3d restore -- src/util/u_mm.c`
+
+
+---
+
+**mesa_libcxx_algorithm.patch**:
+исправляет сборку компилятора шейдеров Intel из Mesa с библиотекой libc++ из OpenHarmony clang. В `src/intel/compiler/brw_compile_fs.cpp` используется `std::min`, но заголовок `<algorithm>`, в котором он объявлен, явно не подключается. С `libstdc++` он приходит транзитивно через другие заголовки, а `libc++` так не делает, поэтому сборка падает с ошибкой `no member named 'min' in namespace 'std'`. Патч добавляет в начало файла явный `#include <algorithm>`. На поведение кода это не влияет и сборку с другими библиотеками C++ не ломает.
+Применить (из корня дерева OpenHarmony):
+* `P=/mnt/ohos/OpenHarmony7/oneir_patches/mesa_libcxx_algorithm.patch`
+* `git -C third_party/mesa3d apply --check "$P"`
+* `git -C third_party/mesa3d apply "$P"`
+
+Откатить:
+* `git -C third_party/mesa3d restore -- src/intel/compiler/brw_compile_fs.cpp`
