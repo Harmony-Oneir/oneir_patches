@@ -20,3 +20,15 @@
 
 Откатить:
 * `git -C third_party/mesa3d restore -- src/intel/compiler/brw_compile_fs.cpp`
+
+---
+
+**mesa_ohos_no_wsi_display.patch**:
+исключает из сборки Mesa под OpenHarmony поддержку `VK_KHR_display`, то есть вывода изображения из Vulkan напрямую через KMS, минуя оконную систему. Реализация в `src/vulkan/wsi/wsi_common_display.c` использует `pthread_cancel` и `pthread_setcanceltype`, которых нет в musl OpenHarmony, поэтому линковка `libvulkan_intel.so` падает с неопределёнными символами. В OpenHarmony это расширение не нужно: изображение выводит композитор, а поверхности Vulkan создаются через `VK_OHOS_*`. Патч дополняет условие `not with_platform_android` проверкой `not with_platform_ohos` в двух местах: в `src/vulkan/wsi/meson.build` (сборка файла) и в `src/vulkan/meson.build` (`define VK_USE_PLATFORM_DISPLAY_KHR`). Так OpenHarmony обрабатывается так же, как Android, а сборки под другие платформы не меняются.
+Применить (из корня дерева OpenHarmony):
+* `P=/mnt/ohos/OpenHarmony7/oneir_patches/mesa_ohos_no_wsi_display.patch`
+* `git -C third_party/mesa3d apply --check "$P"`
+* `git -C third_party/mesa3d apply "$P"`
+
+Откатить:
+* `git -C third_party/mesa3d restore -- src/vulkan/wsi/meson.build src/vulkan/meson.build`
