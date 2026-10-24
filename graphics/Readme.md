@@ -58,3 +58,17 @@
 Откатить:
 * `git -C third_party/mesa3d restore -- src/vulkan/registry/vk.xml include/vulkan/vulkan_core.h include/vulkan/vulkan_ohos.h`
 * `rm -f third_party/mesa3d/include/vulkan/vk_ohos_native_buffer.h`
+
+---
+
+**mesa_ohos_vk_runtime.patch**:
+добавляет в общий Vulkan-код Mesa (`src/vulkan/runtime`) не зависящую от драйвера часть расширения `VK_OHOS_native_buffer`. Новый файл `vk_ohos.c` реализует три функции: `vkAcquireImageOHOS` импортирует sync-fd «буфер освободился» во временный `VkSemaphore` и/или `VkFence`, `vkQueueSignalReleaseImageOHOS` возвращает sync-fd «рендер в буфер завершён» для передачи потребителю (композитору или окну), а `vkGetSwapchainGrallocUsageOHOS` переводит флаги использования изображения Vulkan во флаги буфера OpenHarmony. Это перенос соответствующих функций `vk_android.c`. Для экспорта используется семафор, создаваемый на каждый вызов, поэтому общую структуру `vk_queue` менять не нужно. Файл подключается в `src/vulkan/runtime/meson.build` только при `with_platform_ohos`. Требует применённого `mesa_ohos_vk_registry.patch`. Подходит для любого Vulkan-драйвера Mesa, поддерживающего `VK_KHR_external_semaphore_fd` и `VK_KHR_external_fence_fd`.
+Применить (из корня дерева OpenHarmony):
+* `P=/mnt/ohos/OpenHarmony7/oneir_patches/graphics/mesa_ohos_vk_runtime.patch`
+* `git -C third_party/mesa3d apply --check "$P"`
+* `git -C third_party/mesa3d apply "$P"`
+
+Откатить:
+* `git -C third_party/mesa3d restore -- src/vulkan/runtime/meson.build`
+* `git -C third_party/mesa3d reset -q -- src/vulkan/runtime/vk_ohos.c`
+* `rm -f third_party/mesa3d/src/vulkan/runtime/vk_ohos.c`
