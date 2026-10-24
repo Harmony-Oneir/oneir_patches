@@ -72,3 +72,20 @@
 * `git -C third_party/mesa3d restore -- src/vulkan/runtime/meson.build`
 * `git -C third_party/mesa3d reset -q -- src/vulkan/runtime/vk_ohos.c`
 * `rm -f third_party/mesa3d/src/vulkan/runtime/vk_ohos.c`
+
+---
+
+**mesa_ohos_anv.patch**: 
+добавляет в Vulkan-драйвер Intel (anv) поддержку расширений `VK_OHOS_native_buffer` и `VK_OHOS_external_memory`, которые Render Service требует в Vulkan-режиме. Новые файлы `anv_ohos.c` и `anv_ohos.h` работают с буферами OpenHarmony: получают `BufferHandle` из `OH_NativeBuffer` через `OH_NativeBuffer_GetBufferHandle` (`libsurface.z.so`), импортируют его dma-buf в anv, переводят формат пикселей OpenHarmony в VkFormat и создают изображения с линейным тайлингом, пересчитывая шаг строки из байтов в пиксели. Реализованы `vkGetNativeBufferPropertiesOHOS`, создание и привязка изображений поверх `VkNativeBufferOHOS` (путь слоя swapchain) и импорт памяти через `VkImportNativeBufferInfoOHOS` с отложенной раскладкой изображения до `vkBindImageMemory`, как для `AHardwareBuffer` (путь RS). Встраивание сделано в тех же местах, где обрабатывается Android, и помечено комментарием `/* oneir: OHOS */`: `anv_physical_device.c`, `anv_private.h`, `anv_image.c`, `anv_device.c`, `meson.build`. Экспорт памяти в `OH_NativeBuffer` и внешние YUV-форматы пока не реализованы. Требует применённых `mesa_ohos_vk_registry.patch` и `mesa_ohos_vk_runtime.patch`.
+
+Применить (из корня дерева OpenHarmony):
+
+* `P=/mnt/ohos/OpenHarmony7/oneir_patches/graphics/mesa_ohos_anv.patch`
+* `git -C third_party/mesa3d apply --check "$P"`
+* `git -C third_party/mesa3d apply "$P"`
+
+Откатить:
+
+* `git -C third_party/mesa3d restore -- src/intel/vulkan/anv_physical_device.c src/intel/vulkan/anv_private.h src/intel/vulkan/anv_image.c src/intel/vulkan/anv_device.c src/intel/vulkan/meson.build`
+* `git -C third_party/mesa3d reset -q -- src/intel/vulkan/anv_ohos.c src/intel/vulkan/anv_ohos.h`
+* `rm -f third_party/mesa3d/src/intel/vulkan/anv_ohos.c third_party/mesa3d/src/intel/vulkan/anv_ohos.h`
