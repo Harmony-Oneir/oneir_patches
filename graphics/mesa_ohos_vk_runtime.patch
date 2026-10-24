@@ -1,0 +1,227 @@
+diff --git a/src/vulkan/runtime/meson.build b/src/vulkan/runtime/meson.build
+index 9d34ae432f0..235c838f885 100644
+--- a/src/vulkan/runtime/meson.build
++++ b/src/vulkan/runtime/meson.build
+@@ -64,6 +64,10 @@ if with_platform_android
+   vulkan_lite_runtime_deps += [dep_android, idep_u_gralloc]
+ endif
+ 
++if with_platform_ohos
++  vulkan_lite_runtime_files += files('vk_ohos.c')
++endif
++
+ vk_common_entrypoints = custom_target(
+   'vk_common_entrypoints',
+   input : [vk_entrypoints_gen, vk_api_xml],
+diff --git a/src/vulkan/runtime/vk_ohos.c b/src/vulkan/runtime/vk_ohos.c
+new file mode 100644
+index 00000000000..ca5070b0adf
+--- /dev/null
++++ b/src/vulkan/runtime/vk_ohos.c
+@@ -0,0 +1,206 @@
++/*
++ * Copyright © 2026 Harmony-Oneir
++ * SPDX-License-Identifier: MIT
++ *
++ * Общая (не зависящая от драйвера) часть VK_OHOS_native_buffer:
++ *   vkAcquireImageOHOS             — sync-fd окна/экрана -> VkSemaphore/VkFence
++ *   vkQueueSignalReleaseImageOHOS  — завершение рендера -> sync-fd для потребителя
++ *   vkGetSwapchainGrallocUsageOHOS — флаги использования буфера для слоя swapchain
++ *
++ * Перенос vk_common_AcquireImageANDROID / vk_common_QueueSignalReleaseImageANDROID
++ * из vk_android.c: механизм тот же, меняются только имена и типы OpenHarmony.
++ * Драйвер должен поддерживать VK_KHR_external_semaphore_fd и VK_KHR_external_fence_fd
++ * с типом SYNC_FD.
++ */
++
++#include <errno.h>
++#include <unistd.h>
++
++#include "vk_common_entrypoints.h"
++#include "vk_device.h"
++#include "vk_log.h"
++#include "vk_queue.h"
++#include "vk_util.h"
++
++#include "util/macros.h"
++#include "util/stack_array.h"
++
++/* Флаги использования буфера OpenHarmony (BufferUsage, graphic_surface / display_type.h).
++ * Значения совпадают с HBM_USE_* интерфейса Display HDI. */
++#define OHOS_BUFFER_USAGE_CPU_READ    (1ULL << 0)
++#define OHOS_BUFFER_USAGE_CPU_WRITE   (1ULL << 1)
++#define OHOS_BUFFER_USAGE_MEM_DMA     (1ULL << 3)
++#define OHOS_BUFFER_USAGE_HW_RENDER   (1ULL << 8)
++#define OHOS_BUFFER_USAGE_HW_TEXTURE  (1ULL << 9)
++
++/*
++Переводит флаги использования изображения Vulkan во флаги буфера OpenHarmony (dma-buf, рендер, текстура) для слоя swapchain
++*/
++VKAPI_ATTR VkResult VKAPI_CALL
++vk_common_GetSwapchainGrallocUsageOHOS(VkDevice device,
++                                       VkFormat format,
++                                       VkImageUsageFlags imageUsage,
++                                       uint64_t *grallocUsage)
++{
++   (void)device;
++   (void)format;
++
++   /* Буфер всегда выделяется как dma-buf: только такой драйвер может импортировать. */
++   uint64_t usage = OHOS_BUFFER_USAGE_MEM_DMA;
++
++   if (imageUsage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
++                     VK_IMAGE_USAGE_TRANSFER_DST_BIT |
++                     VK_IMAGE_USAGE_STORAGE_BIT))
++      usage |= OHOS_BUFFER_USAGE_HW_RENDER;
++
++   if (imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT |
++                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
++                     VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT))
++      usage |= OHOS_BUFFER_USAGE_HW_TEXTURE;
++
++   *grallocUsage = usage;
++   return VK_SUCCESS;
++}
++
++/*
++Получает sync-fd «буфер освободился» и импортирует его во временный VkSemaphore и/или VkFence (если нужны оба, делает dup). 
++Забирает владение fd: закрывает его и при ошибке, и если импортировать некуда
++*/
++VKAPI_ATTR VkResult VKAPI_CALL
++vk_common_AcquireImageOHOS(VkDevice _device,
++                           VkImage image,
++                           int32_t nativeFenceFd,
++                           VkSemaphore semaphore,
++                           VkFence fence)
++{
++   VK_FROM_HANDLE(vk_device, device, _device);
++   VkResult result = VK_SUCCESS;
++   (void)image;
++
++   /* Функция забирает владение nativeFenceFd: его нужно либо импортировать,
++    * либо закрыть, в том числе при ошибке. Если нужны и семафор, и fence,
++    * sync-fd импортируется дважды, поэтому второй экземпляр — копия. */
++   int semaphore_fd = -1, fence_fd = -1;
++   if (nativeFenceFd >= 0) {
++      if (semaphore != VK_NULL_HANDLE && fence != VK_NULL_HANDLE) {
++         semaphore_fd = nativeFenceFd;
++         fence_fd = dup(nativeFenceFd);
++         if (fence_fd < 0) {
++            VkResult err = (errno == EMFILE) ? VK_ERROR_TOO_MANY_OBJECTS
++                                             : VK_ERROR_OUT_OF_HOST_MEMORY;
++            close(nativeFenceFd);
++            return vk_error(device, err);
++         }
++      } else if (semaphore != VK_NULL_HANDLE) {
++         semaphore_fd = nativeFenceFd;
++      } else if (fence != VK_NULL_HANDLE) {
++         fence_fd = nativeFenceFd;
++      } else {
++         close(nativeFenceFd);
++      }
++   }
++
++   /* fd = -1 при импорте SYNC_FD означает «уже сигнализирован». */
++   if (semaphore != VK_NULL_HANDLE) {
++      const VkImportSemaphoreFdInfoKHR info = {
++         .sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR,
++         .semaphore = semaphore,
++         .flags = VK_SEMAPHORE_IMPORT_TEMPORARY_BIT,
++         .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
++         .fd = semaphore_fd,
++      };
++      result = device->dispatch_table.ImportSemaphoreFdKHR(_device, &info);
++      if (result == VK_SUCCESS)
++         semaphore_fd = -1; /* владение у драйвера */
++   }
++
++   if (result == VK_SUCCESS && fence != VK_NULL_HANDLE) {
++      const VkImportFenceFdInfoKHR info = {
++         .sType = VK_STRUCTURE_TYPE_IMPORT_FENCE_FD_INFO_KHR,
++         .fence = fence,
++         .flags = VK_FENCE_IMPORT_TEMPORARY_BIT,
++         .handleType = VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT,
++         .fd = fence_fd,
++      };
++      result = device->dispatch_table.ImportFenceFdKHR(_device, &info);
++      if (result == VK_SUCCESS)
++         fence_fd = -1;
++   }
++
++   if (semaphore_fd >= 0)
++      close(semaphore_fd);
++   if (fence_fd >= 0)
++      close(fence_fd);
++
++   return result;
++}
++/*
++Делает пустую отправку в очередь, которая ждёт семафоров рендера и сигнализирует
++семафор с экспортом в SYNC_FD, а затем отдаёт этот sync-fd вызывающему.
++RS передаёт его дальше вместе с буфером
++*/
++VKAPI_ATTR VkResult VKAPI_CALL
++vk_common_QueueSignalReleaseImageOHOS(VkQueue _queue,
++                                      uint32_t waitSemaphoreCount,
++                                      const VkSemaphore *pWaitSemaphores,
++                                      VkImage image,
++                                      int32_t *pNativeFenceFd)
++{
++   VK_FROM_HANDLE(vk_queue, queue, _queue);
++   struct vk_device *device = queue->base.device;
++   VkDevice _device = vk_device_to_handle(device);
++   VkResult result;
++   (void)image;
++
++   /* Семафор с экспортом в SYNC_FD. В Android-версии он один на очередь
++    * (поле vk_queue::anb_semaphore, есть только под DETECT_OS_ANDROID);
++    * здесь создаётся на каждый вызов, чтобы не менять vk_queue. Экспорт SYNC_FD
++    * переносит полезную нагрузку в fd, после чего семафор можно сразу удалить. */
++   const VkExportSemaphoreCreateInfo export_info = {
++      .sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO,
++      .handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
++   };
++   const VkSemaphoreCreateInfo create_info = {
++      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
++      .pNext = &export_info,
++   };
++   VkSemaphore signal_sem;
++   result = device->dispatch_table.CreateSemaphore(_device, &create_info, NULL, &signal_sem);
++   if (result != VK_SUCCESS)
++      return result;
++
++   STACK_ARRAY(VkPipelineStageFlags, stage_flags, MAX2(1, waitSemaphoreCount));
++   for (uint32_t i = 0; i < MAX2(1, waitSemaphoreCount); i++)
++      stage_flags[i] = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
++
++   /* Пустая отправка: дождаться семафоров рендера и сигнализировать signal_sem. */
++   const VkSubmitInfo submit_info = {
++      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
++      .waitSemaphoreCount = waitSemaphoreCount,
++      .pWaitSemaphores = pWaitSemaphores,
++      .pWaitDstStageMask = stage_flags,
++      .signalSemaphoreCount = 1,
++      .pSignalSemaphores = &signal_sem,
++   };
++   result = device->dispatch_table.QueueSubmit(_queue, 1, &submit_info, VK_NULL_HANDLE);
++   STACK_ARRAY_FINISH(stage_flags);
++
++   if (result == VK_SUCCESS) {
++      const VkSemaphoreGetFdInfoKHR get_fd = {
++         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR,
++         .handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT,
++         .semaphore = signal_sem,
++      };
++      int fd = -1;
++      result = device->dispatch_table.GetSemaphoreFdKHR(_device, &get_fd, &fd);
++      if (result == VK_SUCCESS) {
++         if (pNativeFenceFd)
++            *pNativeFenceFd = fd;
++         else if (fd >= 0)
++            close(fd);
++      }
++   }
++
++   device->dispatch_table.DestroySemaphore(_device, signal_sem, NULL);
++   return result;
++}
