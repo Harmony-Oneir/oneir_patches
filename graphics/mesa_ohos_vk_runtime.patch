@@ -15,10 +15,10 @@ index 9d34ae432f0..235c838f885 100644
    input : [vk_entrypoints_gen, vk_api_xml],
 diff --git a/src/vulkan/runtime/vk_ohos.c b/src/vulkan/runtime/vk_ohos.c
 new file mode 100644
-index 00000000000..ca5070b0adf
+index 00000000000..cb92b050419
 --- /dev/null
 +++ b/src/vulkan/runtime/vk_ohos.c
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,208 @@
 +/*
 + * Copyright © 2026 Harmony-Oneir
 + * SPDX-License-Identifier: MIT
@@ -43,8 +43,9 @@ index 00000000000..ca5070b0adf
 +#include "vk_queue.h"
 +#include "vk_util.h"
 +
++#include <stdlib.h>
++
 +#include "util/macros.h"
-+#include "util/stack_array.h"
 +
 +/* Флаги использования буфера OpenHarmony (BufferUsage, graphic_surface / display_type.h).
 + * Значения совпадают с HBM_USE_* интерфейса Display HDI. */
@@ -54,9 +55,6 @@ index 00000000000..ca5070b0adf
 +#define OHOS_BUFFER_USAGE_HW_RENDER   (1ULL << 8)
 +#define OHOS_BUFFER_USAGE_HW_TEXTURE  (1ULL << 9)
 +
-+/*
-+Переводит флаги использования изображения Vulkan во флаги буфера OpenHarmony (dma-buf, рендер, текстура) для слоя swapchain
-+*/
 +VKAPI_ATTR VkResult VKAPI_CALL
 +vk_common_GetSwapchainGrallocUsageOHOS(VkDevice device,
 +                                       VkFormat format,
@@ -83,10 +81,6 @@ index 00000000000..ca5070b0adf
 +   return VK_SUCCESS;
 +}
 +
-+/*
-+Получает sync-fd «буфер освободился» и импортирует его во временный VkSemaphore и/или VkFence (если нужны оба, делает dup). 
-+Забирает владение fd: закрывает его и при ошибке, и если импортировать некуда
-+*/
 +VKAPI_ATTR VkResult VKAPI_CALL
 +vk_common_AcquireImageOHOS(VkDevice _device,
 +                           VkImage image,
@@ -155,11 +149,7 @@ index 00000000000..ca5070b0adf
 +
 +   return result;
 +}
-+/*
-+Делает пустую отправку в очередь, которая ждёт семафоров рендера и сигнализирует
-+семафор с экспортом в SYNC_FD, а затем отдаёт этот sync-fd вызывающему.
-+RS передаёт его дальше вместе с буфером
-+*/
++
 +VKAPI_ATTR VkResult VKAPI_CALL
 +vk_common_QueueSignalReleaseImageOHOS(VkQueue _queue,
 +                                      uint32_t waitSemaphoreCount,
@@ -190,8 +180,19 @@ index 00000000000..ca5070b0adf
 +   if (result != VK_SUCCESS)
 +      return result;
 +
-+   STACK_ARRAY(VkPipelineStageFlags, stage_flags, MAX2(1, waitSemaphoreCount));
-+   for (uint32_t i = 0; i < MAX2(1, waitSemaphoreCount); i++)
++   /* Маски стадий ожидания: обычно семафоров немного — массив на стеке,
++    * иначе в куче. */
++   VkPipelineStageFlags stage_flags_local[8];
++   VkPipelineStageFlags *stage_flags = stage_flags_local;
++   const uint32_t n_stages = MAX2(1, waitSemaphoreCount);
++   if (n_stages > ARRAY_SIZE(stage_flags_local)) {
++      stage_flags = malloc(n_stages * sizeof(*stage_flags));
++      if (!stage_flags) {
++         device->dispatch_table.DestroySemaphore(_device, signal_sem, NULL);
++         return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
++      }
++   }
++   for (uint32_t i = 0; i < n_stages; i++)
 +      stage_flags[i] = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 +
 +   /* Пустая отправка: дождаться семафоров рендера и сигнализировать signal_sem. */
@@ -204,7 +205,8 @@ index 00000000000..ca5070b0adf
 +      .pSignalSemaphores = &signal_sem,
 +   };
 +   result = device->dispatch_table.QueueSubmit(_queue, 1, &submit_info, VK_NULL_HANDLE);
-+   STACK_ARRAY_FINISH(stage_flags);
++   if (stage_flags != stage_flags_local)
++      free(stage_flags);
 +
 +   if (result == VK_SUCCESS) {
 +      const VkSemaphoreGetFdInfoKHR get_fd = {
