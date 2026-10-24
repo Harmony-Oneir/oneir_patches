@@ -32,3 +32,15 @@
 
 Откатить:
 * `git -C third_party/mesa3d restore -- src/vulkan/wsi/meson.build src/vulkan/meson.build`
+
+---
+
+**mesa_ohos_vulkan_kms.patch**:
+возвращает поддержку DRM/KMS для сборок Mesa под OpenHarmony, в которых собираются Vulkan-драйверы. В верхнем `meson.build` при включённой платформе OHOS (-`Dplatforms=ohos`) Mesa безусловно выставляет `system_has_kms_drm = false`: это рассчитано на штатную EGL-сборку OpenHarmony поверх Zink, где прямая работа с DRM не нужна. Из-за этого anv теряет `libdrm` и не собирается (`xf86drm.h` не найден). Патч оставляет отключение DRM только для сборок без Vulkan-драйверов (`_vulkan_drivers` пуст), так что штатная EGL-сборка работает как раньше, а anv получает `libdrm`. Define `VK_USE_PLATFORM_OHOS=1` сохраняется в обоих случаях. Патч применяется вместе с `mesa_ohos_no_wsi_display.patch`: при возвращённом DRM тот исключает из сборки `wsi_common_display.c`, несовместимый с musl OpenHarmony.
+
+Применить (из корня дерева OpenHarmony):
+* `P=/mnt/ohos/OpenHarmony7/oneir_patches/graphics/mesa_ohos_vulkan_kms.patch`
+* `git -C third_party/mesa3d apply --check "$P"`
+* `git -C third_party/mesa3d apply "$P"`
+Откатить:
+* `git -C third_party/mesa3d restore -- meson.build`
