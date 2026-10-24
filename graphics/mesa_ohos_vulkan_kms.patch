@@ -1,0 +1,16 @@
+diff --git a/meson.build b/meson.build
+index f5acd95f286..1473d43d424 100644
+--- a/meson.build
++++ b/meson.build
+@@ -425,7 +425,10 @@ with_platform_ohos = _platforms.contains('ohos')
+ 
+ if with_platform_ohos
+   pre_args += '-DVK_USE_PLATFORM_OHOS=1'
+-  system_has_kms_drm = false
++  # Vulkan-драйверам (anv и др.) нужен DRM/KMS; отключаем его только для сборок без них.
++  if _vulkan_drivers.length() == 0
++    system_has_kms_drm = false
++  endif
+ endif
+ 
+ with_glx = get_option('glx')
