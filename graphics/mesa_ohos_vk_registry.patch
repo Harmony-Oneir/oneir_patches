@@ -1,0 +1,427 @@
+diff --git a/include/vulkan/vulkan_core.h b/include/vulkan/vulkan_core.h
+index af1e1ea8f0b..b9fb8bda555 100644
+--- a/include/vulkan/vulkan_core.h
++++ b/include/vulkan/vulkan_core.h
+@@ -1200,6 +1200,15 @@ typedef enum VkStructureType {
+     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLAMP_ZERO_ONE_FEATURES_KHR = 1000421000,
+     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_ROBUSTNESS_FEATURES_EXT = 1000608000,
+     VK_STRUCTURE_TYPE_SURFACE_CREATE_INFO_OHOS = 1000685000,
++    VK_STRUCTURE_TYPE_NATIVE_BUFFER_OHOS = 1000453001,
++    VK_STRUCTURE_TYPE_SWAPCHAIN_IMAGE_CREATE_INFO_OHOS = 1000453002,
++    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENTATION_PROPERTIES_OHOS = 1000453003,
++    VK_STRUCTURE_TYPE_NATIVE_BUFFER_USAGE_OHOS = 1000452000,
++    VK_STRUCTURE_TYPE_NATIVE_BUFFER_PROPERTIES_OHOS = 1000452001,
++    VK_STRUCTURE_TYPE_NATIVE_BUFFER_FORMAT_PROPERTIES_OHOS = 1000452002,
++    VK_STRUCTURE_TYPE_IMPORT_NATIVE_BUFFER_INFO_OHOS = 1000452003,
++    VK_STRUCTURE_TYPE_MEMORY_GET_NATIVE_BUFFER_INFO_OHOS = 1000452004,
++    VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_OHOS = 1000452005,
+     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTER_FEATURES = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES,
+     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETER_FEATURES = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
+   // VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT is a deprecated alias
+@@ -5185,6 +5194,8 @@ typedef enum VkExternalMemoryHandleTypeFlagBits {
+     VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_KMT_BIT_KHR = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_KMT_BIT,
+     VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_HEAP_BIT_KHR = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_HEAP_BIT,
+     VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT_KHR = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT,
++    VK_EXTERNAL_MEMORY_HANDLE_TYPE_OHOS_NATIVE_BUFFER_BIT_OHOS = 0x00002000,
++    VK_EXTERNAL_MEMORY_HANDLE_TYPE_OH_NATIVE_BUFFER_BIT_OHOS = 0x00008000,
+     VK_EXTERNAL_MEMORY_HANDLE_TYPE_FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
+ } VkExternalMemoryHandleTypeFlagBits;
+ typedef VkFlags VkExternalMemoryHandleTypeFlags;
+diff --git a/include/vulkan/vulkan_ohos.h b/include/vulkan/vulkan_ohos.h
+index e0bf8c6b485..3a22c51ec87 100644
+--- a/include/vulkan/vulkan_ohos.h
++++ b/include/vulkan/vulkan_ohos.h
+@@ -2,7 +2,7 @@
+ #define VULKAN_OHOS_H_ 1
+ 
+ /*
+-** Copyright 2015-2022 The Khronos Group Inc.
++** Copyright 2015-2025 The Khronos Group Inc.
+ **
+ ** SPDX-License-Identifier: Apache-2.0
+ */
+@@ -41,85 +41,98 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateSurfaceOHOS(
+     VkSurfaceKHR*                               pSurface);
+ #endif
+ 
+-
+ #define VK_OHOS_native_buffer 1
+ struct OHBufferHandle;
+ #define VK_OHOS_NATIVE_BUFFER_SPEC_VERSION 1
+ #define VK_OHOS_NATIVE_BUFFER_EXTENSION_NAME "VK_OHOS_native_buffer"
+ 
++/**
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ typedef enum VkSwapchainImageUsageFlagBitsOHOS {
+     VK_SWAPCHAIN_IMAGE_USAGE_SHARED_BIT_OHOS = 0x00000001,
+     VK_SWAPCHAIN_IMAGE_USAGE_FLAG_BITS_MAX_ENUM_OHOS = 0x7FFFFFFF
+ } VkSwapchainImageUsageFlagBitsOHOS;
+ typedef VkFlags VkSwapchainImageUsageFlagsOHOS;
++/**
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ typedef struct VkNativeBufferOHOS {
+     VkStructureType    sType;
+     const void*        pNext;
+     struct OHBufferHandle*      handle;
+ } VkNativeBufferOHOS;
+-
++/**
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ typedef struct VkSwapchainImageCreateInfoOHOS {
+     VkStructureType                   sType;
+     const void*                       pNext;
+     VkSwapchainImageUsageFlagsOHOS    usage;
+ } VkSwapchainImageCreateInfoOHOS;
+-
++/**
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ typedef struct VkPhysicalDevicePresentationPropertiesOHOS {
+     VkStructureType    sType;
+-    const void*        pNext;
++    void*              pNext;
+     VkBool32           sharedImage;
+ } VkPhysicalDevicePresentationPropertiesOHOS;
+ 
+ /**
+- * @brief this type is deprecated, please use PFN_vkAcquireImageOHOS instead
+- * @deprecated
+- */
+-typedef VkResult (VKAPI_PTR *PFN_vkSetNativeFenceFdOpenHarmony)(VkDevice device, int32_t nativeFenceFd, VkSemaphore semaphore, VkFence fence);
+-
+-/**
+- * @brief this type is deprecated, please use PFN_vkQueueSignalReleaseImageOHOS instead
+- * @deprecated
+- */
+-typedef VkResult (VKAPI_PTR *PFN_vkGetNativeFenceFdOpenHarmony)(VkQueue queue, uint32_t waitSemaphoreCount, const VkSemaphore* pWaitSemaphores, VkImage image, int32_t* pNativeFenceFd);
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ typedef VkResult (VKAPI_PTR *PFN_vkGetSwapchainGrallocUsageOHOS)(VkDevice device, VkFormat format, VkImageUsageFlags imageUsage, uint64_t* grallocUsage);
++/**
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ typedef VkResult (VKAPI_PTR *PFN_vkAcquireImageOHOS)(VkDevice device, VkImage image, int32_t nativeFenceFd, VkSemaphore semaphore, VkFence fence);
++/**
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ typedef VkResult (VKAPI_PTR *PFN_vkQueueSignalReleaseImageOHOS)(VkQueue queue, uint32_t waitSemaphoreCount, const VkSemaphore* pWaitSemaphores, VkImage image, int32_t* pNativeFenceFd);
+ 
+ #ifndef VK_NO_PROTOTYPES
+ /**
+- * @brief this interface is deprecated, please use vkAcquireImageOHOS instead
+- * @deprecated
+- */
+-VKAPI_ATTR VkResult VKAPI_CALL vkSetNativeFenceFdOpenHarmony(
+-    VkDevice                                    device,
+-    int32_t                                     nativeFenceFd,
+-    VkSemaphore                                 semaphore,
+-    VkFence                                     fence);
+-
+-/**
+- * @brief this interface is deprecated, please use vkQueueSignalReleaseImageOHOS instead
+- * @deprecated
+- */
+-VKAPI_ATTR VkResult VKAPI_CALL vkGetNativeFenceFdOpenHarmony(
+-    VkQueue                                     queue,
+-    uint32_t                                    waitSemaphoreCount,
+-    const VkSemaphore*                          pWaitSemaphores,
+-    VkImage                                     image,
+-    int32_t*                                    pNativeFenceFd);
+-
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ VKAPI_ATTR VkResult VKAPI_CALL vkGetSwapchainGrallocUsageOHOS(
+     VkDevice                                    device,
+     VkFormat                                    format,
+     VkImageUsageFlags                           imageUsage,
+     uint64_t*                                   grallocUsage);
+-
++/**
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ VKAPI_ATTR VkResult VKAPI_CALL vkAcquireImageOHOS(
+     VkDevice                                    device,
+     VkImage                                     image,
+     int32_t                                     nativeFenceFd,
+     VkSemaphore                                 semaphore,
+     VkFence                                     fence);
+-
++/**
++* @brief move to vk_ohos_native_buffer.h 
++* @since 10
++* @deprecated since 23
++*/
+ VKAPI_ATTR VkResult VKAPI_CALL vkQueueSignalReleaseImageOHOS(
+     VkQueue                                     queue,
+     uint32_t                                    waitSemaphoreCount,
+@@ -128,7 +141,6 @@ VKAPI_ATTR VkResult VKAPI_CALL vkQueueSignalReleaseImageOHOS(
+     int32_t*                                    pNativeFenceFd);
+ #endif
+ 
+-
+ #define VK_OHOS_external_memory 1
+ struct OH_NativeBuffer;
+ #define VK_OHOS_EXTERNAL_MEMORY_SPEC_VERSION 1
+diff --git a/meson.build b/meson.build
+index f5acd95f286..1473d43d424 100644
+--- a/meson.build
++++ b/meson.build
+@@ -425,7 +425,10 @@ with_platform_ohos = _platforms.contains('ohos')
+ 
+ if with_platform_ohos
+   pre_args += '-DVK_USE_PLATFORM_OHOS=1'
+-  system_has_kms_drm = false
++  # Vulkan-драйверам (anv и др.) нужен DRM/KMS; отключаем его только для сборок без них.
++  if _vulkan_drivers.length() == 0
++    system_has_kms_drm = false
++  endif
+ endif
+ 
+ with_glx = get_option('glx')
+diff --git a/src/intel/compiler/brw_compile_fs.cpp b/src/intel/compiler/brw_compile_fs.cpp
+index 31d9e312139..c129e95c287 100644
+--- a/src/intel/compiler/brw_compile_fs.cpp
++++ b/src/intel/compiler/brw_compile_fs.cpp
+@@ -3,6 +3,7 @@
+  * SPDX-License-Identifier: MIT
+  */
+ 
++#include <algorithm>
+ #include "brw_eu.h"
+ #include "brw_fs.h"
+ #include "brw_builder.h"
+diff --git a/src/util/u_mm.c b/src/util/u_mm.c
+index f77f6f40c96..e20233b729f 100644
+--- a/src/util/u_mm.c
++++ b/src/util/u_mm.c
+@@ -29,7 +29,7 @@
+ #include "util/u_mm.h"
+ #include "util/macros.h"
+ #include "util/detect_os.h"
+-#if DETECT_OS_OHOS
++#if DETECT_OS_OHOS && (defined(__aarch64__) || defined(__ARM_NEON))
+ #include <arm_neon.h>
+ #endif
+ 
+@@ -304,7 +304,7 @@ u_mmDestroy(struct mem_block *heap)
+ void
+ memcpy_neon(void *dst, const void* src, size_t size)
+ {
+-#if DETECT_OS_OHOS
++#if DETECT_OS_OHOS && (defined(__aarch64__) || defined(__ARM_NEON))
+    unsigned char* dst0 = (unsigned char*) dst;
+    const unsigned char* src0 = (const unsigned char*) src;
+    if (dst0 == NULL || src0 == NULL) {
+diff --git a/src/vulkan/meson.build b/src/vulkan/meson.build
+index 3225b5f4a9d..dae59b6f386 100644
+--- a/src/vulkan/meson.build
++++ b/src/vulkan/meson.build
+@@ -54,7 +54,7 @@ if with_platform_wayland
+   vulkan_wsi_deps += dep_wayland_client
+   vulkan_wsi_list += '-DVK_USE_PLATFORM_WAYLAND_KHR'
+ endif
+-if system_has_kms_drm and not with_platform_android
++if system_has_kms_drm and not with_platform_android and not with_platform_ohos
+   vulkan_wsi_deps += [dep_libdrm]
+   vulkan_wsi_list += '-DVK_USE_PLATFORM_DISPLAY_KHR'
+ endif
+diff --git a/src/vulkan/registry/vk.xml b/src/vulkan/registry/vk.xml
+index b19170ae260..3f173745066 100644
+--- a/src/vulkan/registry/vk.xml
++++ b/src/vulkan/registry/vk.xml
+@@ -9831,6 +9831,62 @@ typedef void* <name>MTLSharedEvent_id</name>;
+             <member optional="true"><type>void</type>*        <name>pNext</name></member>
+             <member><type>VkBool32</type>                     <name>depthClampZeroOne</name></member>
+         </type>
++        <type category="basetype">struct <name>OH_NativeBuffer</name>;</type>
++        <type requires="VkSwapchainImageUsageFlagBitsOHOS" category="bitmask">typedef <type>VkFlags</type> <name>VkSwapchainImageUsageFlagsOHOS</name>;</type>
++        <type name="VkSwapchainImageUsageFlagBitsOHOS" category="enum" />
++        <type category="struct" name="VkNativeBufferOHOS">
++            <member values="VK_STRUCTURE_TYPE_NATIVE_BUFFER_OHOS"><type>VkStructureType</type> <name>sType</name></member>
++            <member optional="true">const <type>void</type>* <name>pNext</name></member>
++            <member><type>BufferHandle</type>* <name>handle</name></member>
++        </type>
++        <type category="struct" name="VkSwapchainImageCreateInfoOHOS">
++            <member values="VK_STRUCTURE_TYPE_SWAPCHAIN_IMAGE_CREATE_INFO_OHOS"><type>VkStructureType</type> <name>sType</name></member>
++            <member optional="true">const <type>void</type>* <name>pNext</name></member>
++            <member><type>VkSwapchainImageUsageFlagsOHOS</type> <name>usage</name></member>
++        </type>
++        <type category="struct" name="VkPhysicalDevicePresentationPropertiesOHOS">
++            <member values="VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENTATION_PROPERTIES_OHOS"><type>VkStructureType</type> <name>sType</name></member>
++            <member optional="true">const <type>void</type>* <name>pNext</name></member>
++            <member><type>VkBool32</type> <name>sharedImage</name></member>
++        </type>
++        <type category="struct" name="VkImportNativeBufferInfoOHOS" structextends="VkMemoryAllocateInfo">
++            <member values="VK_STRUCTURE_TYPE_IMPORT_NATIVE_BUFFER_INFO_OHOS"><type>VkStructureType</type> <name>sType</name></member>
++            <member optional="true">const <type>void</type>*                        <name>pNext</name></member>
++            <member>struct <type>OH_NativeBuffer</type>*            <name>buffer</name></member>
++        </type>
++        <type category="struct" name="VkNativeBufferUsageOHOS" structextends="VkImageFormatProperties2" returnedonly="true">
++            <member values="VK_STRUCTURE_TYPE_NATIVE_BUFFER_USAGE_OHOS"><type>VkStructureType</type> <name>sType</name></member>
++            <member optional="true"><type>void</type>*                              <name>pNext</name></member>
++            <member><type>uint64_t</type>                           <name>OHOSNativeBufferUsage</name></member>
++        </type>
++        <type category="struct" name="VkNativeBufferPropertiesOHOS" returnedonly="true">
++            <member values="VK_STRUCTURE_TYPE_NATIVE_BUFFER_PROPERTIES_OHOS"><type>VkStructureType</type> <name>sType</name></member>
++            <member optional="true"><type>void</type>*                              <name>pNext</name></member>
++            <member><type>VkDeviceSize</type>                       <name>allocationSize</name></member>
++            <member><type>uint32_t</type>                           <name>memoryTypeBits</name></member>
++        </type>
++        <type category="struct" name="VkMemoryGetNativeBufferInfoOHOS">
++            <member values="VK_STRUCTURE_TYPE_MEMORY_GET_NATIVE_BUFFER_INFO_OHOS"><type>VkStructureType</type> <name>sType</name></member>
++            <member optional="true">const <type>void</type>*                        <name>pNext</name></member>
++            <member><type>VkDeviceMemory</type>                     <name>memory</name></member>
++        </type>
++        <type category="struct" name="VkNativeBufferFormatPropertiesOHOS" structextends="VkNativeBufferPropertiesOHOS" returnedonly="true">
++            <member values="VK_STRUCTURE_TYPE_NATIVE_BUFFER_FORMAT_PROPERTIES_OHOS"><type>VkStructureType</type> <name>sType</name></member>
++            <member optional="true"><type>void</type>*                              <name>pNext</name></member>
++            <member><type>VkFormat</type>                           <name>format</name></member>
++            <member><type>uint64_t</type>                           <name>externalFormat</name></member>
++            <member><type>VkFormatFeatureFlags</type>               <name>formatFeatures</name></member>
++            <member><type>VkComponentMapping</type>                 <name>samplerYcbcrConversionComponents</name></member>
++            <member><type>VkSamplerYcbcrModelConversion</type>      <name>suggestedYcbcrModel</name></member>
++            <member><type>VkSamplerYcbcrRange</type>                <name>suggestedYcbcrRange</name></member>
++            <member><type>VkChromaLocation</type>                   <name>suggestedXChromaOffset</name></member>
++            <member><type>VkChromaLocation</type>                   <name>suggestedYChromaOffset</name></member>
++        </type>
++        <type category="struct" name="VkExternalFormatOHOS" structextends="VkImageCreateInfo,VkSamplerYcbcrConversionCreateInfo">
++            <member values="VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_OHOS"><type>VkStructureType</type> <name>sType</name></member>
++            <member optional="true"><type>void</type>*                              <name>pNext</name></member>
++            <member><type>uint64_t</type>                           <name>externalFormat</name></member>
++        </type>
+     </types>
+ 
+ 
+@@ -11968,6 +12024,9 @@ typedef void* <name>MTLSharedEvent_id</name>;
+         <enum value="0"     name="VK_ACCESS_3_NONE_KHR"/>
+     </enums>
+ 
++    <enums name="VkSwapchainImageUsageFlagBitsOHOS" type="bitmask">
++      <enum bitpos="0" name="VK_SWAPCHAIN_IMAGE_USAGE_SHARED_BIT_OHOS" />
++    </enums>
+     <commands comment="Vulkan command definitions">
+         <command successcodes="VK_SUCCESS" errorcodes="VK_ERROR_OUT_OF_HOST_MEMORY,VK_ERROR_OUT_OF_DEVICE_MEMORY,VK_ERROR_INITIALIZATION_FAILED,VK_ERROR_LAYER_NOT_PRESENT,VK_ERROR_EXTENSION_NOT_PRESENT,VK_ERROR_INCOMPATIBLE_DRIVER">
+             <proto><type>VkResult</type> <name>vkCreateInstance</name></proto>
+@@ -16242,6 +16301,41 @@ typedef void* <name>MTLSharedEvent_id</name>;
+             <param optional="false,true"><type>uint32_t</type>* <name>pPropertyCount</name></param>
+             <param optional="true" len="pPropertyCount"><type>VkCooperativeMatrixFlexibleDimensionsPropertiesNV</type>* <name>pProperties</name></param>
+         </command>
++        <command successcodes="VK_SUCCESS" errorcodes="VK_ERROR_OUT_OF_HOST_MEMORY,VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR">
++            <proto><type>VkResult</type> <name>vkGetNativeBufferPropertiesOHOS</name></proto>
++            <param><type>VkDevice</type> <name>device</name></param>
++            <param>const struct <type>OH_NativeBuffer</type>* <name>buffer</name></param>
++            <param><type>VkNativeBufferPropertiesOHOS</type>* <name>pProperties</name></param>
++        </command>
++        <command successcodes="VK_SUCCESS" errorcodes="VK_ERROR_TOO_MANY_OBJECTS,VK_ERROR_OUT_OF_HOST_MEMORY">
++            <proto><type>VkResult</type> <name>vkGetMemoryNativeBufferOHOS</name></proto>
++            <param><type>VkDevice</type> <name>device</name></param>
++            <param>const <type>VkMemoryGetNativeBufferInfoOHOS</type>* <name>pInfo</name></param>
++            <param>struct <type>OH_NativeBuffer</type>** <name>pBuffer</name></param>
++        </command>
++        <command successcodes="VK_SUCCESS">
++            <proto><type>VkResult</type> <name>vkGetSwapchainGrallocUsageOHOS</name></proto>
++            <param><type>VkDevice</type> <name>device</name></param>
++            <param><type>VkFormat</type> <name>format</name></param>
++            <param><type>VkImageUsageFlags</type> <name>imageUsage</name></param>
++            <param><type>uint64_t</type>* <name>grallocUsage</name></param>
++        </command>
++        <command successcodes="VK_SUCCESS" errorcodes="VK_ERROR_OUT_OF_HOST_MEMORY,VK_TIMEOUT,VK_ERROR_INITIALIZATION_FAILED">
++            <proto><type>VkResult</type> <name>vkAcquireImageOHOS</name></proto>
++            <param><type>VkDevice</type> <name>device</name></param>
++            <param><type>VkImage</type> <name>image</name></param>
++            <param><type>int32_t</type> <name>nativeFenceFd</name></param>
++            <param><type>VkSemaphore</type> <name>semaphore</name></param>
++            <param><type>VkFence</type> <name>fence</name></param>
++        </command>
++        <command successcodes="VK_SUCCESS" errorcodes="VK_ERROR_OUT_OF_HOST_MEMORY,VK_TIMEOUT,VK_ERROR_INITIALIZATION_FAILED">
++            <proto><type>VkResult</type> <name>vkQueueSignalReleaseImageOHOS</name></proto>
++            <param><type>VkQueue</type> <name>queue</name></param>
++            <param><type>uint32_t</type> <name>waitSemaphoreCount</name></param>
++            <param len="waitSemaphoreCount">const <type>VkSemaphore</type>* <name>pWaitSemaphores</name></param>
++            <param><type>VkImage</type> <name>image</name></param>
++            <param><type>int32_t</type>* <name>pNativeFenceFd</name></param>
++        </command>
+     </commands>
+ 
+     <feature api="vulkan,vulkansc" name="VK_VERSION_1_0" number="1.0" comment="Vulkan core API interface definitions">
+@@ -26534,6 +26628,46 @@ typedef void* <name>MTLSharedEvent_id</name>;
+                 <command name="vkCreateSurfaceOHOS"/>
+             </require>
+         </extension>
++        <extension name="VK_OHOS_native_buffer" number="687" type="device" author="OHOS" platform="ohos" contact="Zhao Zhang @andrew0229" supported="vulkan">
++            <require>
++                <comment>VK_OHOS_native_buffer is used between the OpenharmonyOS Vulkan loader and drivers to implement the WSI extensions.</comment>
++                <enum value="1" name="VK_OHOS_NATIVE_BUFFER_SPEC_VERSION" />
++                <enum value="&quot;VK_OHOS_native_buffer&quot;" name="VK_OHOS_NATIVE_BUFFER_EXTENSION_NAME" />
++                <enum offset="1" extends="VkStructureType" name="VK_STRUCTURE_TYPE_NATIVE_BUFFER_OHOS" extnumber="454" />
++                <enum offset="2" extends="VkStructureType" name="VK_STRUCTURE_TYPE_SWAPCHAIN_IMAGE_CREATE_INFO_OHOS" extnumber="454" />
++                <enum offset="3" extends="VkStructureType" name="VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENTATION_PROPERTIES_OHOS" extnumber="454" />
++                <type name="VkNativeBufferOHOS" />
++                <type name="VkSwapchainImageCreateInfoOHOS" />
++                <type name="VkPhysicalDevicePresentationPropertiesOHOS" />
++                <type name="VkSwapchainImageUsageFlagBitsOHOS" />
++                <type name="VkSwapchainImageUsageFlagsOHOS" />
++                <command name="vkGetSwapchainGrallocUsageOHOS" />
++                <command name="vkAcquireImageOHOS" />
++                <command name="vkQueueSignalReleaseImageOHOS" />
++            </require>
++        </extension>
++        <extension name="VK_OHOS_external_memory" number="688" type="device" author="OHOS" requires="VK_KHR_sampler_ycbcr_conversion,VK_KHR_external_memory,VK_EXT_queue_family_foreign,VK_KHR_dedicated_allocation" platform="ohos" contact="Zhao Zhang @andrew0229" supported="vulkan">
++            <require>
++                <enum bitpos="15" extends="VkExternalMemoryHandleTypeFlagBits" name="VK_EXTERNAL_MEMORY_HANDLE_TYPE_OH_NATIVE_BUFFER_BIT_OHOS" /><enum value="1" name="VK_OHOS_EXTERNAL_MEMORY_SPEC_VERSION" />
++                <enum value="&quot;VK_OHOS_external_memory&quot;" name="VK_OHOS_EXTERNAL_MEMORY_EXTENSION_NAME" />
++                <enum bitpos="13" extends="VkExternalMemoryHandleTypeFlagBits" name="VK_EXTERNAL_MEMORY_HANDLE_TYPE_OHOS_NATIVE_BUFFER_BIT_OHOS" />
++                <enum offset="0" extends="VkStructureType" name="VK_STRUCTURE_TYPE_NATIVE_BUFFER_USAGE_OHOS" extnumber="453" />
++                <enum offset="1" extends="VkStructureType" name="VK_STRUCTURE_TYPE_NATIVE_BUFFER_PROPERTIES_OHOS" extnumber="453" />
++                <enum offset="2" extends="VkStructureType" name="VK_STRUCTURE_TYPE_NATIVE_BUFFER_FORMAT_PROPERTIES_OHOS" extnumber="453" />
++                <enum offset="3" extends="VkStructureType" name="VK_STRUCTURE_TYPE_IMPORT_NATIVE_BUFFER_INFO_OHOS" extnumber="453" />
++                <enum offset="4" extends="VkStructureType" name="VK_STRUCTURE_TYPE_MEMORY_GET_NATIVE_BUFFER_INFO_OHOS" extnumber="453" />
++                <enum offset="5" extends="VkStructureType" name="VK_STRUCTURE_TYPE_EXTERNAL_FORMAT_OHOS" extnumber="453" />
++                <type name="VkNativeBufferUsageOHOS" />
++                <type name="VkNativeBufferPropertiesOHOS" />
++                <type name="VkNativeBufferFormatPropertiesOHOS" />
++                <type name="VkImportNativeBufferInfoOHOS" />
++                <type name="VkMemoryGetNativeBufferInfoOHOS" />
++                <type name="VkExternalFormatOHOS" />
++                <command name="vkGetNativeBufferPropertiesOHOS" />
++                <command name="vkGetMemoryNativeBufferOHOS" />
++                <type name="OH_NativeBuffer" />
++            </require>
++        </extension>
+     </extensions>
+     <formats>
+         <format name="VK_FORMAT_R4G4_UNORM_PACK8" class="8-bit" blockSize="1" texelsPerBlock="1" packed="8">
+diff --git a/src/vulkan/wsi/meson.build b/src/vulkan/wsi/meson.build
+index 6933eb780c4..28256853a5e 100644
+--- a/src/vulkan/wsi/meson.build
++++ b/src/vulkan/wsi/meson.build
+@@ -35,7 +35,7 @@ if with_platform_macos
+   files_vulkan_wsi += files('wsi_common_metal.c', 'wsi_common_metal_layer.m')
+ endif
+ 
+-if system_has_kms_drm and not with_platform_android
++if system_has_kms_drm and not with_platform_android and not with_platform_ohos
+   files_vulkan_wsi += files('wsi_common_display.c')
+ endif
+ 
