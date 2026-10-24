@@ -44,3 +44,17 @@
 * `git -C third_party/mesa3d apply "$P"`
 Откатить:
 * `git -C third_party/mesa3d restore -- meson.build`
+
+---
+
+**mesa_ohos_vk_registry.patch**:
+добавляет в Mesa описание расширений VK_OHOS_native_buffer и VK_OHOS_external_memory, необходимых Render Service в Vulkan-режиме. В реестре Mesa (src/vulkan/registry/vk.xml) из OpenHarmony было только VK_OHOS_surface, поэтому генераторы Mesa не знали этих расширений, и драйвер не мог объявить их поддержку. Патч переносит из third_party/vulkan-headers описания структур, команд и обоих расширений. Значения VkStructureType (1000453001…, 1000452000…) и биты типа внешней памяти (0x2000, 0x8000) приведены в соответствие с вручную заданными значениями в vulkan_core.h, с которым собраны RS и слой swapchain. Структура VkPhysicalDevicePresentationPropertiesOHOS отвязана от VkPhysicalDeviceProperties2, чтобы не конфликтовать с Android-аналогом в генераторе свойств. Также обновлены заголовки include/vulkan/vulkan_core.h и vulkan_ohos.h, и добавлен vk_ohos_native_buffer.h. Сама реализация расширений в драйвере в этот патч не входит.
+
+Применить (из корня дерева OpenHarmony):
+* `P=/mnt/ohos/OpenHarmony7/oneir_patches/graphics/mesa_ohos_vk_registry.patch`
+* `git -C third_party/mesa3d apply --check "$P"`
+* `git -C third_party/mesa3d apply "$P"`
+
+Откатить:
+* `git -C third_party/mesa3d restore -- src/vulkan/registry/vk.xml include/vulkan/vulkan_core.h include/vulkan/vulkan_ohos.h`
+* `rm -f third_party/mesa3d/include/vulkan/vk_ohos_native_buffer.h`
