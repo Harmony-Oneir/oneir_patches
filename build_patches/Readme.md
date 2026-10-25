@@ -13,3 +13,18 @@
 Откатить:
 
 * `git -C build restore -- compile_standard_whitelist.json subsystem_components_whitelist.json subsystem_config.json`
+
+---
+
+**graphic_2d_native_vsync_stdint.patch**:
+исправляет заголовок NDK `interfaces/inner_api/composer/native_vsync.h` в `graphic_2d`. Заголовок использует типы `int32_t` и `uint64_t`, но сам не подключает `<stdint.h>`, поэтому собирается только тогда, когда этот заголовок уже подключён раньше другим файлом. Если `native_vsync.h` включается первым (как в примере hello_vsync), компиляция падает с ошибкой unknown type name 'int32_t'. Патч добавляет `#include <stdint.h>` после защиты от повторного включения. На остальные компоненты это не влияет.
+
+Применить (из корня дерева OpenHarmony):
+
+* `P=/mnt/ohos/OpenHarmony7/oneir_patches/graphics/graphic_2d_native_vsync_stdint.patch`
+* `git -C foundation/graphic/graphic_2d apply --check "$P"`
+* `git -C foundation/graphic/graphic_2d apply "$P"`
+
+Откатить:
+
+* `git -C foundation/graphic/graphic_2d restore -- interfaces/inner_api/composer/native_vsync.h`
