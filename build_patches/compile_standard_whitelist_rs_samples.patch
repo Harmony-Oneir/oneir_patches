@@ -1,0 +1,53 @@
+diff --git a/compile_standard_whitelist.json b/compile_standard_whitelist.json
+index 90651a20..b7ad13ac 100644
+--- a/compile_standard_whitelist.json
++++ b/compile_standard_whitelist.json
+@@ -61,7 +61,7 @@
+         "//base/security/device_security_level/baselib/msglib:messenger_static",
+         "//base/security/device_security_level/baselib/utils:utils_static",
+         "//base/security/device_security_level/interfaces/inner_api:dslm_sdk",
+-	"//base/security/device_security_level/interfaces/inner_api:dslm_sdk_small",
++        "//base/security/device_security_level/interfaces/inner_api:dslm_sdk_small",
+         "//base/security/device_security_level/oem_property/ohos/lite:dslm_ohos_cred_obj",
+         "//base/security/device_security_level/services/common:service_common_obj",
+         "//base/security/device_security_level/services/dslm:service_dslm_obj",
+@@ -315,7 +315,12 @@
+         "//third_party/flutter/build/skia:skia_shared",
+         "//third_party/vk-gl-cts/framework/platform/ohos/rosen_context:rosen_context",
+         "//third_party/vk-gl-cts/framework/platform:libdeqp_ohos_platform",
+-        "//ide/tools/previewer:lite_previewer"
++        "//ide/tools/previewer:lite_previewer",
++        "//foundation/graphic/graphic_2d/rosen/samples/hello_rosen:hello_rosen",
++        "//foundation/graphic/graphic_2d/rosen/samples/2d_graphics:drawing_sample_rs",
++        "//foundation/graphic/graphic_2d/rosen/samples/hello_vsync:hello_vsync",
++        "//foundation/graphic/graphic_2d/rosen/samples/hello_native_window:hello_native_window",
++        "//foundation/graphic/graphic_2d/rosen/samples/composer:hello_composer"
+     ],
+     "external_deps_added_self_part_module": [
+         "//build/rust/tests/test_bin_crate:test_bin_crate",
+diff --git a/subsystem_components_whitelist.json b/subsystem_components_whitelist.json
+index e3da579d..4615b104 100644
+--- a/subsystem_components_whitelist.json
++++ b/subsystem_components_whitelist.json
+@@ -3,6 +3,7 @@
+   "product_arm64_virt": "product_arm64_virt",
+   "device_x86_64_virt": "device_x86_64_virt",
+   "product_x86_64_virt": "product_x86_64_virt",
++  "product_oneir": "product_oneir",
+   "developer_test": "testfwk",
+   "acts": "xts",
+   "acts_devices": "xts",
+diff --git a/subsystem_config.json b/subsystem_config.json
+index abda7657..590778ba 100644
+--- a/subsystem_config.json
++++ b/subsystem_config.json
+@@ -242,5 +242,9 @@
+   "soc_p7885": {
+     "path": "device/soc/unisoc/p7885",
+     "name": "soc_p7885"
++  },
++  "oneir": {
++    "path": "oneir",
++    "name": "oneir"
+   }
+ }
