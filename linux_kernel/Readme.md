@@ -61,3 +61,22 @@ git apply -R --check $P
 git apply -R $P
 ```
 
+
+**0004-kernel.mk-apply-qos_auth-common-module.patch**:
+Патч rk3568_patch/kernel.patch прописывает в drivers/Makefile и drivers/Kconfig каталог drivers/auth_ctl. Сам каталог в дерево ядра не входит: его подкладывает скрипт common_modules/qos_auth/apply_qos_auth.sh, а kernel.mk этот скрипт не вызывал. Из-за этого сборка падала уже на make distclean. Патч добавляет вызов скрипта по тому же шаблону, что у остальных модулей common_modules. Проблема не зависит от архитектуры.
+
+Применение:
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/build
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0004-kernel.mk-apply-qos_auth-common-module.patch
+git apply --check $P
+git apply $P
+```
+
+Откатить:
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/build
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0004-kernel.mk-apply-qos_auth-common-module.patch
+git apply -R --check $P
+git apply -R $P
+```
