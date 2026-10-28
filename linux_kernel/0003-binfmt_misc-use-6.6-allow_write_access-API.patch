@@ -1,0 +1,13 @@
+diff --git a/fs/binfmt_misc.c b/fs/binfmt_misc.c
+index afb50f41a..a45b5ba12 100644
+--- a/fs/binfmt_misc.c
++++ b/fs/binfmt_misc.c
+@@ -816,7 +816,7 @@ static ssize_t bm_register_write(struct file *file, const char __user *buffer,
+ 
+ 	if (err) {
+ 		if (f) {
+-			exe_file_allow_write_access(f);
++			allow_write_access(f);
+ 			filp_close(f, NULL);
+ 		}
+ 		kfree(e);
