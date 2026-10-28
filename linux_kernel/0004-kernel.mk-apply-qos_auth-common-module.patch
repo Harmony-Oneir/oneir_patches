@@ -1,0 +1,38 @@
+kernel.mk: apply qos_auth common module
+
+kernel/linux/patches/linux-6.6/rk3568_patch/kernel.patch adds
+"obj-$(CONFIG_AUTHORITY_CTRL) += auth_ctl/" to drivers/Makefile and
+"source drivers/auth_ctl/Kconfig" to drivers/Kconfig, but the
+drivers/auth_ctl directory is not part of the kernel tree: it is provided
+by kernel/linux/common_modules/qos_auth/apply_qos_auth.sh, which kernel.mk
+did not call. As a result even "make distclean" fails with:
+
+  drivers/auth_ctl/Makefile: No such file or directory
+
+Call apply_qos_auth.sh the same way as the other common_modules scripts
+(xpm, dec, code_sign, hideaddr): only if the script exists.
+
+Not architecture-specific.
+
+diff --git a/kernel.mk b/kernel.mk
+index d145e7f..a11a6a3 100644
+--- a/kernel.mk
++++ b/kernel.mk
+@@ -94,6 +94,7 @@ XPM_PATCH_FILE := ${OHOS_BUILD_HOME}/kernel/linux/common_modules/xpm/apply_xpm.s
+ DEC_PATCH_FILE := ${OHOS_BUILD_HOME}/kernel/linux/common_modules/dec/apply_dec.sh
+ CODE_SIGN_PATCH_FILE := ${OHOS_BUILD_HOME}/kernel/linux/common_modules/code_sign/apply_code_sign.sh
+ HIDEADDR_PATCH_FILE := ${OHOS_BUILD_HOME}/kernel/linux/common_modules/memory_security/apply_hideaddr.sh
++QOS_AUTH_PATCH_FILE := ${OHOS_BUILD_HOME}/kernel/linux/common_modules/qos_auth/apply_qos_auth.sh
+ OHOE_HEADERS_FILE := ${OHOS_BUILD_HOME}/kernel/linux/common_modules/ohoe_headers/apply_ohoe_headers.sh
+ WATCHDOG_PATCH_FILE := ${DEVICE_PATCH_DIR}/watchdog.patch
+ OH_HEADERS_PATCH_FILE := ${DEVICE_PATCH_DIR}/oh_headers.patch
+@@ -142,6 +143,9 @@ endif
+ ifeq ($(HIDEADDR_PATCH_FILE), $(wildcard $(HIDEADDR_PATCH_FILE)))
+ 	$(hide) bash $(HIDEADDR_PATCH_FILE) $(OHOS_BUILD_HOME) $(KERNEL_SRC_TMP_PATH) $(DEVICE_NAME) $(KERNEL_VERSION)
+ endif
++ifeq ($(QOS_AUTH_PATCH_FILE), $(wildcard $(QOS_AUTH_PATCH_FILE)))
++	$(hide) bash $(QOS_AUTH_PATCH_FILE) $(OHOS_BUILD_HOME) $(KERNEL_SRC_TMP_PATH) $(DEVICE_NAME) $(KERNEL_VERSION)
++endif
+ # Apply OpenHarmony specific headers patch (required for linux-6.6)
+ ifeq ($(OH_HEADERS_PATCH_FILE), $(wildcard $(OH_HEADERS_PATCH_FILE)))
+ 	$(hide) cd $(KERNEL_SRC_TMP_PATH) && patch -p1 < $(OH_HEADERS_PATCH_FILE)
