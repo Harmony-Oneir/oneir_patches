@@ -62,7 +62,7 @@ git apply -R $P
 ```
 
 
-**0004-kernel.mk-apply-qos_auth-common-module.patch**:
+**0004-kernel.mk-apply-missing-common-modules.patch**:
 Патч rk3568_patch/kernel.patch прописывает в drivers/Makefile и drivers/Kconfig каталог drivers/auth_ctl. Сам каталог в дерево ядра не входит: его подкладывает скрипт common_modules/qos_auth/apply_qos_auth.sh, а kernel.mk этот скрипт не вызывал. Из-за этого сборка падала уже на make distclean. Патч добавляет вызов скрипта по тому же шаблону, что у остальных модулей common_modules. Проблема не зависит от архитектуры.
 
 Применение:
