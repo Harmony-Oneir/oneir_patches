@@ -37,3 +37,27 @@ P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0002-x86-add-missing-amd-fch
 git apply -R --check $P
 git apply -R $P
 ```
+
+**0003-binfmt_misc-use-6.6-allow_write_access-API.patch**:
+Перенесённое исправление в `fs/binfmt_misc.c` вызывает функцию `exe_file_allow_write_access()`, которая существует только в ядрах версии 6.14 и новее — в этих версиях она заменила `allow_write_access()`.
+
+В linux-6.6 по-прежнему используется `allow_write_access()`, поэтому при включённом `CONFIG_BINFMT_MISC` сборка завершается ошибкой. Следует использовать название функции, принятое в версии 6.6, как это сделано в основной ветке linux-6.6.y.
+
+Проблема не зависит от архитектуры: она затрагивает любую конфигурацию с включённым `CONFIG_BINFMT_MISC`.
+
+Применение (из корня дерева ядра):
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0003-binfmt_misc-use-6.6-allow_write_access-API.patch
+git apply --check $P
+git apply $P
+```
+
+Откатить:
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0003-binfmt_misc-use-6.6-allow_write_access-API.patch
+git apply -R --check $P
+git apply -R $P
+```
+
