@@ -82,3 +82,24 @@ P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0004-kernel.mk-apply-missing
 git apply -R --check $P
 git apply -R $P
 ```
+
+**0005-sched-walt-use-arch_scale_cpu_capacity.patch**:
+Планировщик WALT OpenHarmony (`kernel/sched/walt.c`) определяет мощность кластера CPU через `topology_get_cpu_scale()`. Эта функция читает переменную cpu_scale, которая есть только на архитектурах с `GENERIC_ARCH_TOPOLOGY` (arm, arm64, riscv). На x86 её нет, и линковка падала с `undefined reference to 'cpu_scale'`. Патч заменяет вызов на общий для всех архитектур `arch_scale_cpu_capacity()`. На ARM поведение не меняется, потому что там это та же функция. На x86 все ядра получают одинаковую мощность `1024`, что соответствует симметричным процессорам. Затрагивает все архитектуры без `GENERIC_ARCH_TOPOLOGY`, включая x86.
+
+Применить:
+
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0005-sched-walt-use-arch_scale_cpu_capacity.patch
+git apply --check $P
+git apply $P
+```
+
+Откатить:
+
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0005-sched-walt-use-arch_scale_cpu_capacity.patch
+git apply -R --check $P
+git apply -R $P
+```
