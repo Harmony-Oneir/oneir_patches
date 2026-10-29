@@ -1,0 +1,28 @@
+sched/walt: use arch_scale_cpu_capacity() instead of topology_get_cpu_scale()
+
+topology_get_cpu_scale() reads the per-CPU cpu_scale variable, which is
+provided by drivers/base/arch_topology.c and exists only on architectures
+selecting GENERIC_ARCH_TOPOLOGY (arm, arm64, riscv). On x86 the link fails:
+
+  undefined reference to `cpu_scale'
+
+Use the architecture-neutral arch_scale_cpu_capacity(). On arm/arm64 it
+is defined as topology_get_cpu_scale(), so behaviour there is unchanged;
+on x86 all clusters get SCHED_CAPACITY_SCALE, which matches symmetric
+x86 CPUs.
+
+Affects all architectures without GENERIC_ARCH_TOPOLOGY (e.g. x86).
+
+diff --git a/kernel/sched/walt.c b/kernel/sched/walt.c
+index 4391bf669..6cf58794a 100755
+--- a/kernel/sched/walt.c
++++ b/kernel/sched/walt.c
+@@ -1363,7 +1363,7 @@ static struct sched_cluster *alloc_new_cluster(const struct cpumask *cpus)
+ 
+ 	raw_spin_lock_init(&cluster->load_lock);
+ 	cluster->cpus = *cpus;
+-	cluster->efficiency = topology_get_cpu_scale(cpumask_first(cpus));
++	cluster->efficiency = arch_scale_cpu_capacity(cpumask_first(cpus));
+ 
+ 	if (cluster->efficiency > max_possible_efficiency)
+ 		max_possible_efficiency = cluster->efficiency;
