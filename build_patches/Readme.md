@@ -51,3 +51,11 @@ P=/mnt/ohos/OpenHarmony7/oneir_patches/hdc/build-define-HDC_NO_ACCOUNT-consisten
 git apply -R --check $P
 git apply -R $P
 ```
+---
+**hostapd-guard-CheckApBand-with-the-same-condition-as-its-caller.patch**:
+функция `CheckApBand()` в `hostapd/ap_config_file.c` определена без условий, а её единственный вызов компилируется только при `CONFIG_OPEN_HARMONY_PATCH` и `CONFIG_IEEE80211AC` или `CONFIG_IEEE80211AX`. В конфигурациях без поддержки 802.11ac/ax функция не используется, и сборка падает с `-Werror,-Wunused-function`. Патч ставит определение функции под то же условие, что и вызов. Не зависит от архитектуры.
+
+**Важно:** патч применяется к репозиторию `third_party/wpa_supplicant`.
+
+Применение: `cd /mnt/ohos/OpenHarmont7/third_party/wpa_supplicant && git apply $P`
+Откат: `cd /mnt/ohos/OpenHarmont7/third_party/wpa_supplicant && git apply -R $P`
