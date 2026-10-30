@@ -103,3 +103,23 @@ P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0005-sched-walt-use-arch_sca
 git apply -R --check $P
 git apply -R $P
 ```
+
+**0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch**:
+Тест `rtg_test` объявляет магическое число ioctl как `const char RTG_SCHED_IPC_MAGIC = 0xAB`. Знаковость типа `char` зависит от архитектуры: на arm/arm64 он беззнаковый, а на x86 знаковый, и значение `0xAB` превращается в `-85`. При подстановке в `_IOWR()` происходит сдвиг отрицательного числа, и сборка падает с ошибкой `-Werror,-Wshift-negative-value`. Даже без `-Werror` номера ioctl на x86 не совпали бы с номерами драйвера RTG в ядре, и все вызовы в тесте завершались бы ошибкой. Патч объявляет константу как `unsigned char`, чтобы значение было одинаковым на всех архитектурах. На arm/arm64 поведение не меняется.
+**Важно:** патч применяется к репозиторию `kernel/linux/build`.
+
+Применение:
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/build
+P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_build/0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch
+git apply --check $P
+git apply $P
+```
+
+Откатить:
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/build
+P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_build/0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch
+git apply -R --check $P
+git apply -R $P
+```
