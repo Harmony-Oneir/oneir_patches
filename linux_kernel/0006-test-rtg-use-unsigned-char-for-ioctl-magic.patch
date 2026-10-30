@@ -1,0 +1,13 @@
+diff --git a/test/unittest/rtg/rtg_test.cpp b/test/unittest/rtg/rtg_test.cpp
+index a2c5464..659937f 100644
+--- a/test/unittest/rtg/rtg_test.cpp
++++ b/test/unittest/rtg/rtg_test.cpp
+@@ -32,7 +32,7 @@ using namespace testing::ext;
+ using namespace std;
+ 
+ constexpr size_t MAX_LENGTH = 100;
+-const char RTG_SCHED_IPC_MAGIC = 0xAB;
++const unsigned char RTG_SCHED_IPC_MAGIC = 0xAB;
+ const int RTG_ERR = -1;
+ const int RTG_SUCC = 0;
+ const int MAX_TID_NUM = 5;
