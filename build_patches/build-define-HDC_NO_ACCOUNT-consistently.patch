@@ -1,0 +1,24 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 6157bb2e..fc2b3348 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -110,7 +110,9 @@ template("hdcd_source_set") {
+       "MEMORY_POOL_ENABLE"
+     ]
+ 
+-    if (!support_jsapi) {
++    hdc_with_account = build_selinux && image_name == "system" &&
++                       product_name != "ohos-sdk" && support_jsapi
++    if (!hdc_with_account) {
+       defines += [ "HDC_NO_ACCOUNT" ]
+     }
+ 
+@@ -158,7 +160,7 @@ template("hdcd_source_set") {
+       "openssl:libssl_shared",
+     ]
+ 
+-    if (build_selinux && image_name == "system" && product_name != "ohos-sdk" && support_jsapi) {
++    if (hdc_with_account) {
+       external_deps += [
+         "ipc:ipc_single",
+         "os_account:os_account_innerkits",
