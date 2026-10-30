@@ -28,3 +28,26 @@
 Откатить:
 
 * `git -C foundation/graphic/graphic_2d restore -- interfaces/inner_api/composer/native_vsync.h`
+
+---
+
+**build-define-HDC_NO_ACCOUNT-consistently.patch**:
+В `developtools/hdc/BUILD.gn` зависимость `hdcd` от компонента учётных записей (`os_account`) подключается при условии `build_selinux && image_name == "system" && product_name != "ohos-sdk" && support_jsapi`, а макрос `HDC_NO_ACCOUNT`, отключающий использование `os_account_manager.h`, задаётся только при `!support_jsapi`. У продуктов с `build_selinux = false` и `support_jsapi = true` не выполняется ни то, ни другое, и сборка падает с ошибкой `'os_account_manager.h' file not found`. Патч вычисляет условие один раз (`hdc_with_account`) и использует его и для зависимости, и для макроса. Без `os_account` `hdcd` использует пользователя по умолчанию. Не зависит от архитектуры.
+
+**Важно:** патч применяется к репозиторию `developtools/hdc`.
+
+Применение:
+```
+cd /mnt/ohos/OpenHarmony7/developtools/hdc
+P=/mnt/ohos/OpenHarmony7/oneir_patches/hdc/build-define-HDC_NO_ACCOUNT-consistently.patch
+git apply --check $P
+git apply $P
+```
+
+Откатить:
+```
+cd /mnt/ohos/OpenHarmony7/developtools/hdc
+P=/mnt/ohos/OpenHarmony7/oneir_patches/hdc/build-define-HDC_NO_ACCOUNT-consistently.patch
+git apply -R --check $P
+git apply -R $P
+```
