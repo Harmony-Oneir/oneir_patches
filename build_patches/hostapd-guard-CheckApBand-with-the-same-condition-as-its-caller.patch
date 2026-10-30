@@ -1,0 +1,20 @@
+diff --git a/wpa_supplicant-2.9_standard/hostapd/ap_config_file.c b/wpa_supplicant-2.9_standard/hostapd/ap_config_file.c
+index ea53181..f379e29 100755
+--- a/wpa_supplicant-2.9_standard/hostapd/ap_config_file.c
++++ b/wpa_supplicant-2.9_standard/hostapd/ap_config_file.c
+@@ -5222,6 +5222,7 @@ static void hostapd_config_set_bandWidth(struct hostapd_config *conf,
+ #endif
+ }
+ 
++#if defined(CONFIG_OPEN_HARMONY_PATCH) && (defined(CONFIG_IEEE80211AC) || defined(CONFIG_IEEE80211AX))
+ static void CheckApBand(struct hostapd_config *conf)
+ {
+ 	if ((conf->ieee80211ac && conf->ieee80211ax) || (conf->hw_mode != HOSTAPD_MODE_IEEE80211A))
+@@ -5274,6 +5275,7 @@ static void CheckApBand(struct hostapd_config *conf)
+ 		conf->ieee80211ac, conf->ieee80211ax, conf->vht_capab, conf->vht_oper_chwidth, conf->secondary_channel);
+ }
+ #endif
++#endif
+ 
+ #ifdef CONFIG_OPEN_HARMONY_PATCH
+ int hostapd_passphrase_config_fill(struct hostapd_config *conf, const char *pass)
