@@ -1,0 +1,22 @@
+diff --git a/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_native/wifi_hal_interface/wifi_supplicant_hal_interface.cpp b/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_native/wifi_hal_interface/wifi_supplicant_hal_interface.cpp
+index e08eb0aae..9e259ef5b 100644
+--- a/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_native/wifi_hal_interface/wifi_supplicant_hal_interface.cpp
++++ b/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_native/wifi_hal_interface/wifi_supplicant_hal_interface.cpp
+@@ -72,7 +72,7 @@ WifiErrorNo WifiSupplicantHalInterface::RequestToSupplicant(const std::string &r
+ 
+ WifiErrorNo WifiSupplicantHalInterface::RegisterSupplicantEventCallback(SupplicantEventCallback &callback)
+ {
+-#ifdef HDI_CHIP_INTERFACE_SUPPORT
++#if defined(HDI_CHIP_INTERFACE_SUPPORT) || defined(HDI_WPA_INTERFACE_SUPPORT)
+     std::lock_guard<std::mutex> lock(mSupplicantHalMutex);
+     mCallback = callback;
+     return WIFI_HAL_OPT_OK;
+@@ -82,7 +82,7 @@ WifiErrorNo WifiSupplicantHalInterface::RegisterSupplicantEventCallback(Supplica
+ 
+ WifiErrorNo WifiSupplicantHalInterface::UnRegisterSupplicantEventCallback(void)
+ {
+-#ifdef HDI_CHIP_INTERFACE_SUPPORT
++#if defined(HDI_CHIP_INTERFACE_SUPPORT) || defined(HDI_WPA_INTERFACE_SUPPORT)
+     std::lock_guard<std::mutex> lock(mSupplicantHalMutex);
+     mCallback.onScanNotify = nullptr;
+     return WIFI_HAL_OPT_OK;
