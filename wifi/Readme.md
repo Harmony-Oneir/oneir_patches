@@ -8,6 +8,8 @@ ScanService: InitScanMonitor failed.
 
 Патч сохраняет обработчик, если включён любой из двух путей (`HDI_CHIP_INTERFACE_SUPPORT` или `HDI_WPA_INTERFACE_SUPPORT`), что согласуется с остальными функциями файла. При включённом сервисе чипа поведение не меняется. Не зависит от архитектуры.
 
+> **Примечание**: при включенном `wifi_feature_with_hdi_chip_supported` патч не нужен.
+
 **Важно:** патч применяется к репозиторию `foundation/communication/wifi`.
 
 Применение:
