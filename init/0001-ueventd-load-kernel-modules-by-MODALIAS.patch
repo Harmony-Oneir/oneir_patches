@@ -1,0 +1,369 @@
+diff --git a/services/etc/ueventd.cfg b/services/etc/ueventd.cfg
+index 1fdff7f7..78d619df 100644
+--- a/services/etc/ueventd.cfg
++++ b/services/etc/ueventd.cfg
+@@ -19,7 +19,7 @@
+                     "SOCK_NONBLOCK"
+                 ]
+             }],
+-            "caps" : ["DAC_OVERRIDE", "MKNOD", "CHOWN", "FOWNER", "CAP_SETGID"],
++            "caps" : ["DAC_OVERRIDE", "MKNOD", "CHOWN", "FOWNER", "CAP_SETGID", "SYS_MODULE"],
+             "ondemand" : true,
+             "sandbox" : 0,
+             "start-mode" : "condition",
+diff --git a/ueventd/BUILD.gn b/ueventd/BUILD.gn
+index 2f4c5da2..c1f022ae 100644
+--- a/ueventd/BUILD.gn
++++ b/ueventd/BUILD.gn
+@@ -62,6 +62,7 @@ if (defined(ohos_lite)) {
+     "//base/startup/init/ueventd/ueventd.c",
+     "//base/startup/init/ueventd/ueventd_device_handler.c",
+     "//base/startup/init/ueventd/ueventd_firmware_handler.c",
++    "//base/startup/init/ueventd/ueventd_module_loader.c",
+     "//base/startup/init/ueventd/ueventd_read_cfg.c",
+     "//base/startup/init/ueventd/ueventd_socket.c",
+   ]
+diff --git a/ueventd/include/ueventd.h b/ueventd/include/ueventd.h
+index e69fa195..64501d3e 100644
+--- a/ueventd/include/ueventd.h
++++ b/ueventd/include/ueventd.h
+@@ -48,6 +48,7 @@ struct Uevent {
+     const char *deviceName;
+     const char *partitionName;
+     const char *firmware;
++    const char *modalias;
+     ACTION action;
+     int partitionNum;
+     int major;
+diff --git a/ueventd/include/ueventd_module_loader.h b/ueventd/include/ueventd_module_loader.h
+new file mode 100644
+index 00000000..c514802f
+--- /dev/null
++++ b/ueventd/include/ueventd_module_loader.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (c) 2026 Harmony-Oneir
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef BASE_STARTUP_INITLITE_UEVENTD_MODULE_LOADER_H
++#define BASE_STARTUP_INITLITE_UEVENTD_MODULE_LOADER_H
++
++#include "ueventd.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++// Load kernel modules matching MODALIAS of an "add" uevent (with dependencies).
++void HandleModuleAliasEvent(const struct Uevent *uevent);
++
++#ifdef __cplusplus
++}
++#endif
++#endif // BASE_STARTUP_INITLITE_UEVENTD_MODULE_LOADER_H
+diff --git a/ueventd/ueventd.c b/ueventd/ueventd.c
+index 425f6ee2..0ec10a48 100644
+--- a/ueventd/ueventd.c
++++ b/ueventd/ueventd.c
+@@ -14,6 +14,7 @@
+  */
+ 
+ #include "ueventd.h"
++#include "ueventd_module_loader.h"
+ #include <dirent.h>
+ #include <limits.h>
+ #include <fcntl.h>
+@@ -105,6 +106,7 @@ static ACTION GetUeventAction(const char *action)
+ 
+ STATIC void HandleUevent(const struct Uevent *uevent)
+ {
++    HandleModuleAliasEvent(uevent);
+     if (uevent->action == ACTION_ADD || uevent->action == ACTION_CHANGE || uevent->action == ACTION_ONLINE) {
+         ChangeSysAttributePermissions(uevent->syspath);
+     }
+@@ -260,6 +262,8 @@ static void AddUevent(struct Uevent *uevent, const char *event, size_t len)
+         uevent->busNum = StringToInt(event + strlen("BUSNUM="), -1);
+     } else if (STARTSWITH(event, "DEVNUM=")) {
+         uevent->devNum = StringToInt(event + strlen("DEVNUM="), -1);
++    } else if (STARTSWITH(event, "MODALIAS=")) {
++        uevent->modalias = event + strlen("MODALIAS=");
+     }
+ }
+ 
+@@ -269,6 +273,7 @@ void ParseUeventMessage(const char *buffer, ssize_t length, struct Uevent *ueven
+         // Ignore invalid buffer
+         return;
+     }
++    uevent->modalias = NULL;
+ 
+     // reset partition number, major and minor.
+     uevent->partitionName = NULL;
+diff --git a/ueventd/ueventd_module_loader.c b/ueventd/ueventd_module_loader.c
+new file mode 100644
+index 00000000..7c8f228f
+--- /dev/null
++++ b/ueventd/ueventd_module_loader.c
+@@ -0,0 +1,252 @@
++/*
++ * Copyright (c) 2026 Harmony-Oneir
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "ueventd_module_loader.h"
++
++#include <errno.h>
++#include <fcntl.h>
++#include <fnmatch.h>
++#include <limits.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/syscall.h>
++#include <sys/utsname.h>
++#include <sys/wait.h>
++#include <unistd.h>
++
++#include "init_log.h"
++
++#define MODULE_NAME_MAX 64
++#define MODULE_LINE_MAX 4096
++#define MODULE_DEPS_MAX 64
++#define MODULE_MATCH_MAX 8
++
++typedef struct {
++    char *pattern;
++    char *module;
++} ModuleAlias;
++
++static ModuleAlias *g_aliases = NULL;
++static size_t g_aliasCount = 0;
++static int g_aliasState = 0; // 0: not loaded yet, 1: loaded, -1: unavailable
++static char g_moduleDir[PATH_MAX] = {0};
++
++static char **g_requested = NULL;
++static size_t g_requestedCount = 0;
++
++static int FormatPath(char *buf, size_t size, const char *dir, const char *name)
++{
++    int ret = snprintf(buf, size, "%s/%s", dir, name);
++    return (ret < 0 || (size_t)ret >= size) ? -1 : 0;
++}
++
++static int InitModuleDir(void)
++{
++    if (g_moduleDir[0] != '\0') {
++        return 0;
++    }
++    struct utsname uts;
++    if (uname(&uts) != 0) {
++        return -1;
++    }
++    return FormatPath(g_moduleDir, sizeof(g_moduleDir), "/lib/modules", uts.release);
++}
++
++static int AddAlias(const char *pattern, const char *module)
++{
++    ModuleAlias *aliases = realloc(g_aliases, (g_aliasCount + 1) * sizeof(ModuleAlias));
++    if (aliases == NULL) {
++        return -1;
++    }
++    g_aliases = aliases;
++    g_aliases[g_aliasCount].pattern = strdup(pattern);
++    g_aliases[g_aliasCount].module = strdup(module);
++    if (g_aliases[g_aliasCount].pattern == NULL || g_aliases[g_aliasCount].module == NULL) {
++        free(g_aliases[g_aliasCount].pattern);
++        free(g_aliases[g_aliasCount].module);
++        return -1;
++    }
++    g_aliasCount++;
++    return 0;
++}
++
++static void LoadAliases(void)
++{
++    if (g_aliasState != 0) {
++        return;
++    }
++    g_aliasState = -1;
++    char path[PATH_MAX];
++    if (InitModuleDir() != 0 || FormatPath(path, sizeof(path), g_moduleDir, "modules.alias") != 0) {
++        return;
++    }
++    FILE *fp = fopen(path, "re");
++    if (fp == NULL) {
++        INIT_LOGW("Module autoload disabled: cannot open %s, errno %d", path, errno);
++        return;
++    }
++    char line[MODULE_LINE_MAX];
++    while (fgets(line, sizeof(line), fp) != NULL) {
++        char *save = NULL;
++        char *keyword = strtok_r(line, " \t\n", &save);
++        char *pattern = strtok_r(NULL, " \t\n", &save);
++        char *module = strtok_r(NULL, " \t\n", &save);
++        if (keyword == NULL || pattern == NULL || module == NULL || strcmp(keyword, "alias") != 0) {
++            continue;
++        }
++        if (AddAlias(pattern, module) != 0) {
++            break;
++        }
++    }
++    (void)fclose(fp);
++    g_aliasState = 1;
++    INIT_LOGI("Module autoload: %zu aliases loaded from %s", g_aliasCount, path);
++}
++
++static int IsRequested(const char *module)
++{
++    for (size_t i = 0; i < g_requestedCount; i++) {
++        if (strcmp(g_requested[i], module) == 0) {
++            return 1;
++        }
++    }
++    return 0;
++}
++
++static void MarkRequested(const char *module)
++{
++    char **requested = realloc(g_requested, (g_requestedCount + 1) * sizeof(char *));
++    if (requested == NULL) {
++        return;
++    }
++    g_requested = requested;
++    g_requested[g_requestedCount] = strdup(module);
++    if (g_requested[g_requestedCount] != NULL) {
++        g_requestedCount++;
++    }
++}
++
++// "kernel/drivers/x/foo-bar.ko" -> "foo_bar" (module names in modules.alias use '_')
++static int ModuleNameFromPath(const char *path, char *name, size_t size)
++{
++    const char *base = strrchr(path, '/');
++    base = (base == NULL) ? path : base + 1;
++    size_t len = strcspn(base, ".");
++    if (len == 0 || len >= size) {
++        return -1;
++    }
++    for (size_t i = 0; i < len; i++) {
++        name[i] = (base[i] == '-') ? '_' : base[i];
++    }
++    name[len] = '\0';
++    return 0;
++}
++
++static void InsertModule(const char *relPath)
++{
++    char path[PATH_MAX];
++    if (FormatPath(path, sizeof(path), g_moduleDir, relPath) != 0) {
++        return;
++    }
++    int fd = open(path, O_RDONLY | O_CLOEXEC);
++    if (fd < 0) {
++        INIT_LOGE("Module autoload: cannot open %s, errno %d", path, errno);
++        return;
++    }
++    if (syscall(__NR_finit_module, fd, "", 0) == 0) {
++        INIT_LOGI("Module autoload: loaded %s", relPath);
++    } else if (errno != EEXIST) {
++        INIT_LOGE("Module autoload: failed to load %s, errno %d", relPath, errno);
++    }
++    (void)close(fd);
++}
++
++// Load the module and its dependencies listed in modules.dep (dependencies first, in reverse order).
++static void LoadModuleWithDeps(const char *module)
++{
++    char path[PATH_MAX];
++    if (FormatPath(path, sizeof(path), g_moduleDir, "modules.dep") != 0) {
++        return;
++    }
++    FILE *fp = fopen(path, "re");
++    if (fp == NULL) {
++        INIT_LOGE("Module autoload: cannot open %s, errno %d", path, errno);
++        return;
++    }
++    char line[MODULE_LINE_MAX];
++    while (fgets(line, sizeof(line), fp) != NULL) {
++        char *colon = strchr(line, ':');
++        if (colon == NULL) {
++            continue;
++        }
++        *colon = '\0';
++        char name[MODULE_NAME_MAX];
++        if (ModuleNameFromPath(line, name, sizeof(name)) != 0 || strcmp(name, module) != 0) {
++            continue;
++        }
++        char *deps[MODULE_DEPS_MAX];
++        size_t count = 0;
++        char *save = NULL;
++        for (char *tok = strtok_r(colon + 1, " \t\n", &save); tok != NULL && count < MODULE_DEPS_MAX;
++            tok = strtok_r(NULL, " \t\n", &save)) {
++            deps[count++] = tok;
++        }
++        while (count > 0) {
++            InsertModule(deps[--count]);
++        }
++        InsertModule(line);
++        break;
++    }
++    (void)fclose(fp);
++}
++
++void HandleModuleAliasEvent(const struct Uevent *uevent)
++{
++    if (uevent == NULL || uevent->modalias == NULL || uevent->action != ACTION_ADD) {
++        return;
++    }
++    LoadAliases();
++    if (g_aliasState != 1) {
++        return;
++    }
++    const char *matched[MODULE_MATCH_MAX];
++    size_t count = 0;
++    for (size_t i = 0; i < g_aliasCount && count < MODULE_MATCH_MAX; i++) {
++        if (fnmatch(g_aliases[i].pattern, uevent->modalias, 0) != 0 || IsRequested(g_aliases[i].module)) {
++            continue;
++        }
++        MarkRequested(g_aliases[i].module);
++        matched[count++] = g_aliases[i].module;
++    }
++    if (count == 0) {
++        return;
++    }
++    // Load in a detached grandchild: loading may wait for firmware and must not block ueventd.
++    pid_t pid = fork();
++    if (pid < 0) {
++        INIT_LOGE("Module autoload: fork failed, errno %d", errno);
++        return;
++    }
++    if (pid == 0) {
++        if (fork() == 0) {
++            for (size_t i = 0; i < count; i++) {
++                LoadModuleWithDeps(matched[i]);
++            }
++        }
++        _exit(0);
++    }
++    (void)waitpid(pid, NULL, 0);
++}
