@@ -24,6 +24,11 @@ git apply -R --check $P
 git apply -R $P
 ```
 
+Пересборка:
+```
+./make.sh init
+```
+
 Проверка после загрузки системы:
 ```
 dmesg | grep -i "Module autoload"
