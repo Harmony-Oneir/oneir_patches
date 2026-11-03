@@ -111,7 +111,7 @@ git apply -R $P
 Применение:
 ```
 cd /mnt/ohos/OpenHarmony7/kernel/linux/build
-P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_build/0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch
 git apply --check $P
 git apply $P
 ```
@@ -119,7 +119,36 @@ git apply $P
 Откатить:
 ```
 cd /mnt/ohos/OpenHarmony7/kernel/linux/build
-P=/mnt/ohos/OpenHarmony7/oneir_patches/kernel_build/0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch
 git apply -R --check $P
 git apply -R $P
+```
+
+**0007-kernel.mk-build-and-install-kernel-modules.patch**
+
+Сборка ядра OpenHarmony (`kernel.mk`) вызывает только цель `$(KERNEL_IMAGE)` (`bzImage`), поэтому драйверы, отмеченные в конфигурации как модули (`=m`), не собираются: `modules_prepare` лишь готовит дерево к сборке модулей, но сами модули не создаёт. Встроенный (`=y`) драйвер для этого не подходит, если ему нужна прошивка с корневой файловой системы: он запрашивает её при запуске ядра, до монтирования корня. Так устроены, например, драйверы Wi-Fi (`ath10k` и др.).
+
+Патч добавляет после сборки образа ядра два шага: `make modules` собирает модули, `make modules_install` устанавливает их без отладочных символов (`INSTALL_MOD_STRIP=1`) в `$(KERNEL_SRC_TMP_PATH)/../modules/lib/modules/<версия>/` вместе с `modules.dep` и `modules.alias`, которые нужны `modprobe` для зависимостей и подбора драйвера по железу. Если в конфигурации нет модулей, шаги ничего не делают. Не зависит от архитектуры.
+
+**Важно:** патч применяется к репозиторию `kernel/linux/build`.
+
+Применение:
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/build
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0007-kernel.mk-build-and-install-kernel-modules.patch
+git apply --check $P
+git apply $P
+```
+
+Откатить:
+```
+cd /mnt/ohos/OpenHarmony7/kernel/linux/build
+P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0007-kernel.mk-build-and-install-kernel-modules.patch
+git apply -R --check $P
+git apply -R $P
+```
+
+Проверка после сборки ядра:
+```
+find /mnt/ohos/OpenHarmony7/out/kernel/OBJ/modules -name "*.ko" | head
 ```
