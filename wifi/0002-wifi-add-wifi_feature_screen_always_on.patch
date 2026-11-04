@@ -1,0 +1,70 @@
+diff --git a/wifi/bundle.json b/wifi/bundle.json
+index 6564f3e08..8d43aaa37 100644
+--- a/wifi/bundle.json
++++ b/wifi/bundle.json
+@@ -63,6 +63,7 @@
+             "wifi_feature_sta_ap_exclusion",
+             "wifi_feature_with_random_mac_addr",
+             "wifi_feature_with_scan_control",
++            "wifi_feature_screen_always_on",
+             "wifi_feature_with_hdi_wpa_supported",
+             "wifi_feature_network_selection",
+             "wifi_feature_with_hdi_chip_supported",
+diff --git a/wifi/services/wifi_standard/wifi_framework/wifi_manage/BUILD.gn b/wifi/services/wifi_standard/wifi_framework/wifi_manage/BUILD.gn
+index e1122a8a3..21ad7c9ed 100644
+--- a/wifi/services/wifi_standard/wifi_framework/wifi_manage/BUILD.gn
++++ b/wifi/services/wifi_standard/wifi_framework/wifi_manage/BUILD.gn
+@@ -97,6 +97,9 @@ if (defined(ohos_lite)) {
+       "AP_INSTANCE_MAX_NUM=$wifi_feature_with_ap_num",
+     ]
+ 
++    if (wifi_feature_screen_always_on) {
++      defines += [ "WIFI_FEATURE_SCREEN_ALWAYS_ON" ]
++    }
+     if (wifi_feature_with_auth_disable) {
+       defines += [ "PERMISSION_ALWAYS_GRANT" ]
+     }
+diff --git a/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_manager.cpp b/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_manager.cpp
+index 90208edd7..b4b64d325 100644
+--- a/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_manager.cpp
++++ b/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_manager.cpp
+@@ -135,8 +135,13 @@ int WifiManager::Init()
+         }
+     }
+ #ifndef OHOS_ARCH_LITE
++#ifdef WIFI_FEATURE_SCREEN_ALWAYS_ON
++    // Screen state is not managed on this product: treat the screen as always on.
++    WifiConfigCenter::GetInstance().SetScreenState(MODE_STATE_OPEN);
++#else
+     WifiConfigCenter::GetInstance().SetScreenState(
+         PowerMgr::PowerMgrClient::GetInstance().IsScreenOn() ? MODE_STATE_OPEN : MODE_STATE_CLOSE);
++#endif
+     WifiConfigCenter::GetInstance().SetDeviceType(GetDeviceType());
+ #endif
+     InitPidfile();
+diff --git a/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_sub_manage/wifi_event_subscriber_manager.cpp b/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_sub_manage/wifi_event_subscriber_manager.cpp
+index 055447228..37cb45ab3 100644
+--- a/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_sub_manage/wifi_event_subscriber_manager.cpp
++++ b/wifi/services/wifi_standard/wifi_framework/wifi_manage/wifi_sub_manage/wifi_event_subscriber_manager.cpp
+@@ -730,6 +730,9 @@ void CesEventSubscriber::OnReceiveScreenEvent(const OHOS::EventFwk::CommonEventD
+     int screenState = WifiConfigCenter::GetInstance().GetScreenState();
+     int screenStateNew =
+         (action == OHOS::EventFwk::CommonEventSupport::COMMON_EVENT_SCREEN_ON) ? MODE_STATE_OPEN : MODE_STATE_CLOSE;
++#ifdef WIFI_FEATURE_SCREEN_ALWAYS_ON
++    screenStateNew = MODE_STATE_OPEN;
++#endif
+     WifiConfigCenter::GetInstance().SetScreenState(screenStateNew);
+     if (screenStateNew == screenState) {
+         return;
+diff --git a/wifi/wifi.gni b/wifi/wifi.gni
+index 688c9ccfa..3a7ec7800 100644
+--- a/wifi/wifi.gni
++++ b/wifi/wifi.gni
+@@ -53,6 +53,7 @@ declare_args() {
+     wifi_feature_with_hpf_supported = false
+   }
+   wifi_feature_with_scan_control = true
++  wifi_feature_screen_always_on = false
+   wifi_feature_with_hdi_wpa_supported = true
+   wifi_feature_network_selection = false
+   wifi_feature_p2p_random_mac_addr = true
