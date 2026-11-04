@@ -60,3 +60,7 @@ P=/mnt/ohos/OpenHarmony7/oneir_patches/wifi/0002-wifi-add-wifi_feature_screen_al
 git apply -R --check $P
 git apply -R $P
 ```
+Пересборка:
+```
+./make.sh --reload netstack
+```
