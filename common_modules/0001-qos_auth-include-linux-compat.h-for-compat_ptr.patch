@@ -1,0 +1,24 @@
+diff --git a/qos_auth/auth_ctl/auth_ctrl.c b/qos_auth/auth_ctl/auth_ctrl.c
+index aae7a2c..8390a05 100644
+--- a/qos_auth/auth_ctl/auth_ctrl.c
++++ b/qos_auth/auth_ctl/auth_ctrl.c
+@@ -6,6 +6,7 @@
+  *
+  */
+ 
++#include <linux/compat.h>
+ #include <linux/cred.h>
+ #include <linux/mutex.h>
+ #include <linux/errno.h>
+diff --git a/qos_auth/auth_ctl/qos_ctrl.c b/qos_auth/auth_ctl/qos_ctrl.c
+index 73bc107..1c6e10f 100644
+--- a/qos_auth/auth_ctl/qos_ctrl.c
++++ b/qos_auth/auth_ctl/qos_ctrl.c
+@@ -5,6 +5,7 @@
+  * Copyright (c) 2022 Huawei Device Co., Ltd.
+  *
+  */
++#include <linux/compat.h>
+ #include <linux/sched.h>
+ #include <linux/list.h>
+ #include <linux/mutex.h>
