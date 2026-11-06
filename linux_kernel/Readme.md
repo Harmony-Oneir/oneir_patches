@@ -66,7 +66,7 @@ git apply -R $P
 
 ---
 
-**0004-kernel.mk-apply-missing-common-modules.patch**:
+**0004-kernel.mk-apply-missing-common-modules.patch** [fix(rtg_test): fix ioctl magic number sign mismatch on x86](https://github.com/openharmony/kernel_linux_build/pull/1):
 Патч `rk3568_patch/kernel.patch` прописывает в `Makefile` и `Kconfig` каталоги `drivers/auth_ctl`, `drivers/tzdriver` и `net/newip`. Сами каталоги в дерево ядра не входят: их подкладывают скрипты `apply_qos_auth.sh`, `apply_tzdriver.sh` и `apply_newip.sh` из `kernel/linux/common_modules`, а `kernel.mk` эти скрипты не вызывал. Из-за этого сборка падает уже на `make distclean`. Патч добавляет вызов скриптов по тому же шаблону, что у остальных модулей `common_modules`. Сами функции включаются или выключаются опциями в defconfig; tzdriver (драйвер ARM TrustZone) на x86 остаётся выключенным. Проблема не зависит от архитектуры.
 
 Важно: патч применяется к репозиторию `kernel/linux/build`, а не к дереву ядра.
