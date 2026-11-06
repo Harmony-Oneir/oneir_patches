@@ -112,9 +112,9 @@ git apply -R $P
 
 ---
 
-**0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch**:
+**0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch** [fix(rtg_test): fix ioctl magic number sign mismatch on x86](https://github.com/openharmony/kernel_linux_build/pull/1):
 Тест `rtg_test` объявляет магическое число ioctl как `const char RTG_SCHED_IPC_MAGIC = 0xAB`. Знаковость типа `char` зависит от архитектуры: на arm/arm64 он беззнаковый, а на x86 знаковый, и значение `0xAB` превращается в `-85`. При подстановке в `_IOWR()` происходит сдвиг отрицательного числа, и сборка падает с ошибкой `-Werror,-Wshift-negative-value`. Даже без `-Werror` номера ioctl на x86 не совпали бы с номерами драйвера RTG в ядре, и все вызовы в тесте завершались бы ошибкой. Патч объявляет константу как `unsigned char`, чтобы значение было одинаковым на всех архитектурах. На arm/arm64 поведение не меняется.
-**Важно:** патч применяется к репозиторию `kernel/linux/build`.
+**Важно:** патч применяется к репозиторию `kernel/linux/build`. 
 
 Применение:
 ```
