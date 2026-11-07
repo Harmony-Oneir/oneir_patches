@@ -134,7 +134,7 @@ git apply -R $P
 
 ---
 
-**0007-kernel.mk-build-and-install-kernel-modules.patch**
+**0007-kernel.mk-build-and-install-kernel-modules.patch** [Add module build and installation steps to kernel.mk](https://github.com/openharmony/kernel_linux_build/commit/9181c75b27641db8d794da64dde4abc27e9484f5)
 
 Сборка ядра OpenHarmony (`kernel.mk`) вызывает только цель `$(KERNEL_IMAGE)` (`bzImage`), поэтому драйверы, отмеченные в конфигурации как модули (`=m`), не собираются: `modules_prepare` лишь готовит дерево к сборке модулей, но сами модули не создаёт. Встроенный (`=y`) драйвер для этого не подходит, если ему нужна прошивка с корневой файловой системы: он запрашивает её при запуске ядра, до монтирования корня. Так устроены, например, драйверы Wi-Fi (`ath10k` и др.).
 
