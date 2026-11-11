@@ -1,0 +1,27 @@
+--- a/ueventd/ueventd_device_handler.c
++++ b/ueventd/ueventd_device_handler.c
+@@ -371,17 +371,23 @@
+         char *bus = GetRealPath(subsystem);
+         if (bus == NULL) {
+             parent = dirname(parent);
+             continue;
+         }
+-        if (STRINGEQUAL(bus, "/sys/bus/platform")) {
++        bool isPci = STRINGEQUAL(bus, "/sys/bus/pci");
++        if (STRINGEQUAL(bus, "/sys/bus/platform") || isPci) {
+             INIT_LOGV("Find a platform device: %s", parent);
+             parent = FindPlatformDeviceName(parent);
+             if (parent != NULL) {
+                 INIT_WARNING_CHECK(linkNum < BLOCKDEVICE_LINKS - 1, free(bus); links[linkNum] = NULL;
+                     return links, "Too many links, ignore");
+                 linkNum = BuildDeviceSymbolLinks(links, linkNum, parent, uevent->partitionName, uevent->deviceName);
+                 linkNum++;
+             }
++            if (isPci) {
++                // oneir: x86 disks (NVMe/AHCI) sit on PCI, not platform bus; stop at nearest PCI device
++                free(bus);
++                break;
++            }
+         }
+         free(bus);
+         parent = dirname(parent);
