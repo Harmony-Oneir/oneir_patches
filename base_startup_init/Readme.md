@@ -58,4 +58,4 @@ git -C base/startup/init apply --reverse --check $D/0002-*.patch && echo "при
 ```bash
 git -C base/startup/init apply --reverse $D/0002-*.patch
 ```
-
+Меняется только бинарник ueventd (/system/bin/ueventd), ядро не трогается. Необходимо пересобрать цель rootfs_init.
