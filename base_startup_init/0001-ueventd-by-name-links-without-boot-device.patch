@@ -1,0 +1,14 @@
+--- a/ueventd/ueventd_device_handler.c
++++ b/ueventd/ueventd_device_handler.c
+@@ -262,6 +262,11 @@
+ static bool BootDeviceIsMatched(const char *parent)
+ {
++    // oneir: default_boot_device not set -> create by-name links for any disk
++    if (bootDevice[0] == '\0') {
++        return true;
++    }
++
+     int bootDeviceNum = GetBootDeviceNum();
+     if (bootDeviceNum <= 1) {
+         return STRINGEQUAL(parent, bootDevice);
+     }
