@@ -1,0 +1,42 @@
+diff --git a/rosen/modules/render_service/core/transaction/rs_client_to_render_connection.h b/rosen/modules/render_service/core/transaction/rs_client_to_render_connection.h
+index fc63a66619..27fa18b9f8 100644
+--- a/rosen/modules/render_service/core/transaction/rs_client_to_render_connection.h
++++ b/rosen/modules/render_service/core/transaction/rs_client_to_render_connection.h
+@@ -204,6 +204,8 @@ private:
+     bool RegisterSurfaceTransactionListenerNew(sptr<RSISurfaceTransactionListener> listener,
+         uint64_t listenerId, uint32_t pid, uint32_t tid) override;
+ 
++    // oneir: oneway: см. RSClientToRenderConnectionStub::GetRemotePid
++    pid_t GetRemotePid() const override { return remotePid_; }
+     pid_t remotePid_;
+     wptr<RSRenderService> renderService_;
+     sptr<RSRenderPipelineAgent> renderPipelineAgent_;
+diff --git a/rosen/modules/render_service/core/transaction/zidl/rs_client_to_render_connection_stub.cpp b/rosen/modules/render_service/core/transaction/zidl/rs_client_to_render_connection_stub.cpp
+index 4a0bbafefa..11eb83ca52 100644
+--- a/rosen/modules/render_service/core/transaction/zidl/rs_client_to_render_connection_stub.cpp
++++ b/rosen/modules/render_service/core/transaction/zidl/rs_client_to_render_connection_stub.cpp
+@@ -304,6 +304,11 @@ int RSClientToRenderConnectionStub::OnRemoteRequest(
+     uint32_t parcelNumber = RS_PROFILER_ON_REMOTE_REQUEST(this, code, data, reply, option);
+     AshmemFdContainer::SetIsUnmarshalThread(false);
+     pid_t callingPid = GetCallingPid();
++    // oneir: oneway: открытое ядро OHOS не передаёт PID отправителя асинхронного вызова (0).
++    // Клиент соединения известен: оно создано синхронным вызовом с достоверным PID.
++    if (callingPid == 0 && (option.GetFlags() & MessageOption::TF_ASYNC)) {
++        callingPid = GetRemotePid();
++    }
+     RSMarshallingHelper::SetCallingPid(callingPid);
+     auto tid = gettid();
+     {
+diff --git a/rosen/modules/render_service/core/transaction/zidl/rs_client_to_render_connection_stub.h b/rosen/modules/render_service/core/transaction/zidl/rs_client_to_render_connection_stub.h
+index 21ea09ad74..f76db84fd6 100644
+--- a/rosen/modules/render_service/core/transaction/zidl/rs_client_to_render_connection_stub.h
++++ b/rosen/modules/render_service/core/transaction/zidl/rs_client_to_render_connection_stub.h
+@@ -33,6 +33,8 @@ public:
+     RSClientToRenderConnectionStub() = default;
+     ~RSClientToRenderConnectionStub() noexcept = default;
+ 
++    // oneir: oneway: PID клиента соединения (для oneway, где ядро даёт 0)
++    virtual pid_t GetRemotePid() const { return 0; }
+     int OnRemoteRequest(uint32_t code, MessageParcel& data, MessageParcel& reply, MessageOption& option) override;
+ 
+ private:
