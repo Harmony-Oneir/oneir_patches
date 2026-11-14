@@ -49,7 +49,7 @@ git -C drivers/peripheral apply --reverse $(pwd)/oneir/oneir_patches/drivers_per
 Патч только добавляет возможность выбора, режим задаётся в описании продукта `productdefine/common/products/oneir.json`, в разделе компонента `drivers_peripheral_wlan`:
 
 ```json
-"drivers_peripheral_wlan_feature_country_code_mode = \"auto\""
+"drivers_peripheral_wlan_feature_country_code_mode = auto"
 ```
 
 Без этой строки действует `"vendor"`, то есть поведение OpenHarmony.
