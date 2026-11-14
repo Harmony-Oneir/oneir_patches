@@ -1,0 +1,108 @@
+diff --git a/wlan/bundle.json b/wlan/bundle.json
+index c38bc0ed5..93641d511 100644
+--- a/wlan/bundle.json
++++ b/wlan/bundle.json
+@@ -17,6 +17,7 @@
+       "drivers_peripheral_wlan_feature_enable_HDF_UT",
+       "drivers_peripheral_wlan_feature_enable_HDF_WLAN_EXTEND_VDI",
+       "drivers_peripheral_wlan_feature_vendor",
++      "drivers_peripheral_wlan_feature_country_code_mode",
+       "drivers_peripheral_wlan_feature_emulator",
+       "drivers_peripheral_wlan_p2p_name",
+       "drivers_peripheral_wlan_feature_pluggable"
+diff --git a/wlan/chip/hdi_service/BUILD.gn b/wlan/chip/hdi_service/BUILD.gn
+index fdd67da41..8a9530793 100644
+--- a/wlan/chip/hdi_service/BUILD.gn
++++ b/wlan/chip/hdi_service/BUILD.gn
+@@ -156,6 +156,19 @@ if (drivers_peripheral_wlan_feature_vendor == "default") {
+       defines = [ "SUPPORT_EMULATOR" ]
+     }
+ 
++    # oneir: способ установки кода страны, см. drivers_peripheral_wlan_feature_country_code_mode
++    if (drivers_peripheral_wlan_feature_country_code_mode == "nl80211") {
++      _country_code_mode = "1"
++    } else if (drivers_peripheral_wlan_feature_country_code_mode == "auto") {
++      _country_code_mode = "2"
++    } else {
++      _country_code_mode = "0"
++    }
++    if (!defined(defines)) {
++      defines = []
++    }
++    defines += [ "WIFI_HAL_COUNTRY_CODE_MODE=$_country_code_mode" ]
++
+     if (is_standard_system) {
+       external_deps = [
+         "c_utils:utils",
+diff --git a/wlan/chip/wifi_hal/wifi_hal.cpp b/wlan/chip/wifi_hal/wifi_hal.cpp
+index b424a3585..a9efe0f74 100644
+--- a/wlan/chip/wifi_hal/wifi_hal.cpp
++++ b/wlan/chip/wifi_hal/wifi_hal.cpp
+@@ -1261,6 +1261,33 @@ private:
+     const char *mCountryCode;
+ };
+ 
++/* Country code mode, set at build time by drivers_peripheral_wlan_feature_country_code_mode:
++ *   0 (vendor)  - vendor command only (default OpenHarmony behaviour)
++ *   1 (nl80211) - standard NL80211_CMD_REQ_SET_REG only (any cfg80211 driver)
++ *   2 (auto)    - vendor command, then standard command if the driver rejects it */
++#ifndef WIFI_HAL_COUNTRY_CODE_MODE
++#define WIFI_HAL_COUNTRY_CODE_MODE 0
++#endif
++
++class SetRegDomainCommand : public WifiCommand {
++public:
++    SetRegDomainCommand(wifiInterfaceHandle handle, const char *countryCode)
++        : WifiCommand("SetRegDomainCommand", handle, 0), mCountryCode(countryCode)
++    {
++    }
++    int Create() override
++    {
++        int ret = mMsg.Create(FamilyId(), NL80211_CMD_REQ_SET_REG, 0, 0);
++        if (ret < 0) {
++            HDF_LOGE("Can't create NL80211_CMD_REQ_SET_REG - %{public}d", ret);
++            return ret;
++        }
++        return mMsg.PutString(NL80211_ATTR_REG_ALPHA2, mCountryCode);
++    }
++private:
++    const char *mCountryCode;
++};
++
+ static WifiError WifiSetCountryCode(wifiInterfaceHandle handle, const char *country_code)
+ {
+     if (!handle) {
+@@ -1268,8 +1295,18 @@ static WifiError WifiSetCountryCode(wifiInterfaceHandle handle, const char *coun
+         return HAL_INVALID_ARGS;
+     }
+     auto lock = ReadLockData();
+-    SetCountryCodeCommand command(handle, country_code);
+-    return (WifiError) command.RequestResponse();
++    if (WIFI_HAL_COUNTRY_CODE_MODE != 1) {
++        SetCountryCodeCommand command(handle, country_code);
++        int ret = command.RequestResponse();
++        if (WIFI_HAL_COUNTRY_CODE_MODE == 0 || ret == HAL_SUCCESS) {
++            return (WifiError) ret;
++        }
++        HDF_LOGW("vendor SetCountryCode failed (%{public}d), using NL80211_CMD_REQ_SET_REG", ret);
++    }
++    SetRegDomainCommand regCommand(handle, country_code);
++    int ret = regCommand.RequestResponse();
++    HDF_LOGI("NL80211_CMD_REQ_SET_REG %{public}s: %{public}d", country_code, ret);
++    return (WifiError) ret;
+ }
+ 
+ class GetAssociatedInfoCommand : public WifiCommand {
+diff --git a/wlan/wlan.gni b/wlan/wlan.gni
+index 40cddd7f3..82835cbaf 100644
+--- a/wlan/wlan.gni
++++ b/wlan/wlan.gni
+@@ -17,6 +17,8 @@ declare_args() {
+   drivers_peripheral_wlan_feature_enable_HDF_WLAN_EXTEND_VDI = true
+   drivers_peripheral_wlan_feature_emulator = false
+   drivers_peripheral_wlan_feature_vendor = "hardware"
++  # oneir: способ установки кода страны в wifi_hal_default: "vendor" | "nl80211" | "auto"
++  drivers_peripheral_wlan_feature_country_code_mode = "vendor"
+   drivers_peripheral_wlan_p2p_name = "p2p0"
+   drivers_peripheral_wlan_feature_pluggable = false
+ }
