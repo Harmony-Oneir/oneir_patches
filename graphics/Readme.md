@@ -89,3 +89,30 @@
 * `git -C third_party/mesa3d restore -- src/intel/vulkan/anv_physical_device.c src/intel/vulkan/anv_private.h src/intel/vulkan/anv_image.c src/intel/vulkan/anv_device.c src/intel/vulkan/meson.build`
 * `git -C third_party/mesa3d reset -q -- src/intel/vulkan/anv_ohos.c src/intel/vulkan/anv_ohos.h`
 * `rm -f third_party/mesa3d/src/intel/vulkan/anv_ohos.c third_party/mesa3d/src/intel/vulkan/anv_ohos.h`
+
+---
+**0001-rs-oneway-calling-pid-from-connection.patch**:
+Открытое ядро OHOS (linux-5.10/6.6) не передаёт PID отправителя для асинхронных
+(oneway) вызовов binder: `GetCallingPid() = 0`. Проверки владельца в
+RSClientToRenderConnectionStub (IsValidCallingPid) поэтому отклоняют все
+асинхронные команды внешних клиентов, например `SET_HARDWARE_ENABLED`:
+  "The SetHardwareEnabled isn't legal ... callingPid:0"
+
+Патч: если вызов асинхронный и `callingPid == 0`, берётся `remotePid_` соединения.
+Соединение создаётся синхронным `CreateRenderConnection()`, где PID достоверен,
+и вызвать его методы может только процесс, у которого есть его прокси.
+Синхронные вызовы не меняются.
+
+Репозиторий: `foundation/graphic/graphic_2d`
+Файлы: `rs_client_to_render_connection_stub.{h,cpp}`, `rs_client_to_render_connection.h`
+
+Применить / откатить
+```bash
+P=$PWD/oneir/oneir_patches/graphic/0001-rs-oneway-calling-pid-from-connection.patch
+git -C foundation/graphic/graphic_2d apply $P
+
+git -C foundation/graphic/graphic_2d apply --reverse $P
+```
+
+## Что пересобрать
+librender_service (цель render_service:librender_service).
