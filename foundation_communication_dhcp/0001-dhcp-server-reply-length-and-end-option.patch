@@ -1,0 +1,51 @@
+diff --git a/services/dhcp_server/include/dhcp_message.h b/services/dhcp_server/include/dhcp_message.h
+index 41e4693..e95a785 100644
+--- a/services/dhcp_server/include/dhcp_message.h
++++ b/services/dhcp_server/include/dhcp_message.h
+@@ -23,7 +23,7 @@
+ #define BOOTREQUEST 1
+ #define BOOTREPLY 2
+ 
+-#define DHCP_MSG_HEADER_SIZE 234
++#define DHCP_MSG_HEADER_SIZE 236  /* BOOTP header: 4+4+4+16+16+64+128 */
+ 
+ enum DhcpMessageType {
+     DHCPDISCOVER = 1,
+diff --git a/services/dhcp_server/src/dhcp_s_server.cpp b/services/dhcp_server/src/dhcp_s_server.cpp
+index abeb5a2..cfd46a7 100755
+--- a/services/dhcp_server/src/dhcp_s_server.cpp
++++ b/services/dhcp_server/src/dhcp_s_server.cpp
+@@ -1839,6 +1839,7 @@ static int ParseReplyOptions(PDhcpMsgInfo reply)
+     DhcpOption endOpt = {END_OPTION, 0, {0}};
+     PushBackOption(&reply->options, &endOpt);
+     int replyOptsLength = 0;
++    bool endWritten = false;
+     uint8_t *current = reply->packet.options, olen = MAGIC_COOKIE_LENGTH;
+     size_t remainingSize = sizeof(reply->packet.options);
+     uint32_t cookie = htonl(DHCP_MAGIC_COOKIE);
+@@ -1865,6 +1866,7 @@ static int ParseReplyOptions(PDhcpMsgInfo reply)
+         current += olen;
+         replyOptsLength += olen;
+         if ((uint32_t)pNode->option.code == END_OPTION) {
++            endWritten = true;
+             break;
+         }
+         pNode = pNode->next;
+@@ -1874,6 +1876,17 @@ static int ParseReplyOptions(PDhcpMsgInfo reply)
+             break;
+         }
+     }
++    /* END with length 0 is rejected by CreateOptionNode, so it is usually not in the list:
++     * write the terminator explicitly (RFC 2132: options end with 255). */
++    if (ret == RET_SUCCESS && !endWritten) {
++        if (remainingSize < 1) {
++            DHCP_LOGE("no room for END option!");
++            ret = RET_FAILED;
++        } else {
++            *current = END_OPTION;
++            replyOptsLength += 1;
++        }
++    }
+     reply->length += replyOptsLength;
+     return ret;
+ }
