@@ -162,3 +162,31 @@ git apply -R $P
 ```
 find /mnt/ohos/OpenHarmony7/out/kernel/OBJ/modules -name "*.ko" | head
 ```
+
+
+**0008-blackbox-add-x86-system-adapter.patch**
+
+Ядро blackbox OpenHarmony (`drivers/staging/blackbox`) — только реестр модулей: само на аварии не реагирует. Панику ловит системный адаптер платформы, а данные до перезагрузки хранит pstore. В OpenHarmony такой адаптер есть только для Rockchip: каталог `blackbox/rockchip` приходит из `kernel/linux/patches/linux-6.6/rk3568_patch/kernel.patch` и собирается только при `ARCH_ROCKCHIP`. В самом `kernel_linux_6.6` его нет.
+
+Патч добавляет `drivers/staging/blackbox/x86/` — копию `rockchip/system_adapter.c` (вариант с pstore_ram) со своими `Kconfig` (`CONFIG_BLACKBOX_X86`) и `Makefile`. Код адаптера платформенно-независим, кроме сброса кэша данных перед перезагрузкой: `dcache_clean_inval_poc()`, `__flush_dcache_area()` и `__cpuc_flush_dcache_area()` есть только на ARM, на x86 используется `clflush_cache_range()`. Вариант «через память» (`system_adapter_by_memory.c`) не перенесён: он требует тёплой перезагрузки без стирания ОЗУ, на ноутбуке это ненадёжно.
+
+Хуки стоят в начале `blackbox/Kconfig` и `blackbox/Makefile`, поэтому патч накладывается и на чистое ядро, и поверх `rk3568_patch` (тот дописывает свои строки в конец этих файлов). Порядок компоновки не важен: у ядра blackbox статический список модулей и `core_initcall`, у адаптера — `postcore_initcall`.
+
+Нужны опции: `CONFIG_PSTORE`, `CONFIG_PSTORE_RAM`, `CONFIG_PSTORE_BLACKBOX`, `CONFIG_BLACKBOX_STORAGE_BY_PSTORE_RAM`, `CONFIG_BLACKBOX_X86`, а также пути логов `CONFIG_BLACKBOX_LOG_ROOT_PATH` и `CONFIG_BLACKBOX_LOG_PART_REPRESENTATIVE`. На стенде пока не проверено.
+
+Применить (из корня дерева ядра):
+
+```
+cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0008-blackbox-add-x86-system-adapter.patch
+git apply --check $P
+git apply $P
+```
+
+Откатить:
+
+```
+cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0008-blackbox-add-x86-system-adapter.patch
+git apply -R --check $P
+git apply -R $P
