@@ -1,25 +1,35 @@
 blackbox: read the pstore record on linux 6.6
 
-On linux 6.6 the OpenHarmony blackbox does not read the pstore record at
-all. get_log_by_pstore() opens /sys/fs/pstore/blackbox-*, prints "read ...
-is succ", sets g_blackbox_flag, closes and deletes the file, but never
-reads it into the buffer: pbuf/pos are unused and the __error label is
-dead code. The system adapter then takes the version-specific branch
-"if (g_blackbox_flag) return 0;" without filling error_info. As a result
+On linux 6.6 the OpenHarmony blackbox never reads the pstore record, so
 every fault log is saved with empty event/module/time and an empty
 last_kmsg, and the record itself is deleted.
 
-pstore_blackbox_dump() (fs/pstore/platform.c) writes exactly the format
-the old (5.10) branch of the adapter expects: struct fault_log_info
-(LOG_FLAG, event, module "PSTORE", time, stack, len) followed by kmsg.
+Root cause: pstore files only implement the old ->read operation. Since
+the removal of set_fs(), kernel_read() requires ->read_iter and fails
+with -EINVAL ("kernel read not supported for file /blackbox-ramoops-0").
+Instead of fixing that, get_log_by_pstore() was reduced to a stub that
+opens the record, sets g_blackbox_flag, closes and deletes it without
+reading, and the system adapter got a version-specific branch
+"if (g_blackbox_flag) return 0;" that does not fill error_info.
 
+pstore_blackbox_dump() (fs/pstore/platform.c) writes exactly the format
+the 5.10 branch of the adapter expects: struct fault_log_info (LOG_FLAG,
+event, module "PSTORE", time, stack, len) followed by kmsg.
+
+- fs/pstore/inode.c: replace ->read with ->read_iter (same logic:
+  seq_read_iter() for ftrace, copy from the record buffer otherwise),
+  so kernel_read() works; reading from user space is unchanged.
 - blackbox_storage.c: kernel_read() the record into the buffer; set the
   flag and delete the record only after a successful read.
 - x86/system_adapter.c: drop the version-specific branch in
   get_last_log_info() and always parse the header.
 
-The rockchip adapter (from rk3568_patch) has the same problem and is not
-touched here. Requires 0008.
+The rockchip adapter (from rk3568_patch) has the same adapter-side
+problem and is not touched here. Requires 0008.
+
+Tested in QEMU (q35, NVMe GPT disk, ramoops): reboot and
+"echo c > /proc/sysrq-trigger" produce /data/log/bbox/<time>/last_kmsg
+with event PANIC, module SYSTEM and the panic stack trace.
 
 diff --git a/drivers/staging/blackbox/blackbox_storage.c b/drivers/staging/blackbox/blackbox_storage.c
 index 117d05ea4..eef422054 100644
@@ -62,3 +72,55 @@ index fe3a06293..e4d65f493 100644
  	bbox_print_info("There's no valid fault log!\n");
  
  	return -ENOMSG;
+diff --git a/fs/pstore/inode.c b/fs/pstore/inode.c
+index a1c97cd27..02ac99da2 100644
+--- a/fs/pstore/inode.c
++++ b/fs/pstore/inode.c
+@@ -7,6 +7,7 @@
+ 
+ #include <linux/module.h>
+ #include <linux/fs.h>
++#include <linux/uio.h>
+ #include <linux/fsnotify.h>
+ #include <linux/pagemap.h>
+ #include <linux/highmem.h>
+@@ -126,16 +127,24 @@ static const struct seq_operations pstore_ftrace_seq_ops = {
+ 	.show	= pstore_ftrace_seq_show,
+ };
+ 
+-static ssize_t pstore_file_read(struct file *file, char __user *userbuf,
+-						size_t count, loff_t *ppos)
++static ssize_t pstore_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+ {
+-	struct seq_file *sf = file->private_data;
++	struct seq_file *sf = iocb->ki_filp->private_data;
+ 	struct pstore_private *ps = sf->private;
++	loff_t pos = iocb->ki_pos;
++	size_t n;
+ 
+ 	if (ps->record->type == PSTORE_TYPE_FTRACE)
+-		return seq_read(file, userbuf, count, ppos);
+-	return simple_read_from_buffer(userbuf, count, ppos,
+-				       ps->record->buf, ps->total_size);
++		return seq_read_iter(iocb, to);
++	if (pos < 0)
++		return -EINVAL;
++	if (pos >= ps->total_size)
++		return 0;
++	n = copy_to_iter(ps->record->buf + pos, ps->total_size - pos, to);
++	if (!n && iov_iter_count(to))
++		return -EFAULT;
++	iocb->ki_pos = pos + n;
++	return n;
+ }
+ 
+ static int pstore_file_open(struct inode *inode, struct file *file)
+@@ -169,7 +178,7 @@ static loff_t pstore_file_llseek(struct file *file, loff_t off, int whence)
+ 
+ static const struct file_operations pstore_file_operations = {
+ 	.open		= pstore_file_open,
+-	.read		= pstore_file_read,
++	.read_iter	= pstore_file_read_iter,
+ 	.llseek		= pstore_file_llseek,
+ 	.release	= seq_release,
+ };
