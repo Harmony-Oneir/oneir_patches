@@ -2,7 +2,7 @@
 В ветку OpenHarmony-7.0-Release ядра linux-6.6 портировали исправление уязвимости CVE-2025-22090. Она касается учёта типа кэширования (PAT) для памяти устройств при неудачном fork(). Общий код ядра перевели на новую сигнатуру track_pfn_copy(dst, src, &pfn) и добавили вызов untrack_pfn_copy(), а x86-реализацию в memtype.c обновить забыли. Из-за этого сборка падает с ошибкой conflicting types for 'track_pfn_copy'. Патч приводит x86-часть к виду из upstream linux-6.6.y.
 
 Применение (Из корня дерева ядра):
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0001-x86-mm-pat-fix-track_pfn_copy-after-CVE-backport.patch
 git apply --check $P
@@ -11,7 +11,7 @@ git apply $P
 
 Откатить:
 
-```
+```bash
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0001-x86-mm-pat-fix-track_pfn_copy-after-CVE-backport.patch
 git apply -R $P
 ```
@@ -23,7 +23,7 @@ git apply -R $P
 
 Применить (из корня дерева ядра):
 
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0002-x86-add-missing-amd-fch-h.patch
 git apply --check $P
@@ -32,7 +32,7 @@ git apply $P
 
 Откатить:
 
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0002-x86-add-missing-amd-fch-h.patch
 git apply -R --check $P
@@ -49,7 +49,7 @@ git apply -R $P
 Проблема не зависит от архитектуры: она затрагивает любую конфигурацию с включённым `CONFIG_BINFMT_MISC`.
 
 Применение (из корня дерева ядра):
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0003-binfmt_misc-use-6.6-allow_write_access-API.patch
 git apply --check $P
@@ -57,7 +57,7 @@ git apply $P
 ```
 
 Откатить:
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0003-binfmt_misc-use-6.6-allow_write_access-API.patch
 git apply -R --check $P
@@ -72,7 +72,7 @@ git apply -R $P
 Важно: патч применяется к репозиторию `kernel/linux/build`, а не к дереву ядра.
 
 Применение:
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/build
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0004-kernel.mk-apply-missing-common-modules.patch
 git apply --check $P
@@ -80,7 +80,7 @@ git apply $P
 ```
 
 Откатить:
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/build
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0004-kernel.mk-apply-missing-common-modules.patch
 git apply -R --check $P
@@ -94,7 +94,7 @@ git apply -R $P
 
 Применить:
 
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0005-sched-walt-use-arch_scale_cpu_capacity.patch
 git apply --check $P
@@ -103,7 +103,7 @@ git apply $P
 
 Откатить:
 
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0005-sched-walt-use-arch_scale_cpu_capacity.patch
 git apply -R --check $P
@@ -117,7 +117,7 @@ git apply -R $P
 **Важно:** патч применяется к репозиторию `kernel/linux/build`. 
 
 Применение:
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/build
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch
 git apply --check $P
@@ -125,7 +125,7 @@ git apply $P
 ```
 
 Откатить:
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/build
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0006-test-rtg-use-unsigned-char-for-ioctl-magic.patch
 git apply -R --check $P
@@ -143,7 +143,7 @@ git apply -R $P
 **Важно:** патч применяется к репозиторию `kernel/linux/build`.
 
 Применение:
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/build
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0007-kernel.mk-build-and-install-kernel-modules.patch
 git apply --check $P
@@ -151,7 +151,7 @@ git apply $P
 ```
 
 Откатить:
-```
+```bash
 cd /mnt/ohos/OpenHarmony7/kernel/linux/build
 P=/mnt/ohos/OpenHarmony7/oneir_patches/linux_kernel/0007-kernel.mk-build-and-install-kernel-modules.patch
 git apply -R --check $P
@@ -159,7 +159,7 @@ git apply -R $P
 ```
 
 Проверка после сборки ядра:
-```
+```blah
 find /mnt/ohos/OpenHarmony7/out/kernel/OBJ/modules -name "*.ko" | head
 ```
 
@@ -177,7 +177,7 @@ find /mnt/ohos/OpenHarmony7/out/kernel/OBJ/modules -name "*.ko" | head
 
 Применить (из корня дерева ядра):
 
-```
+```bash
 cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0008-blackbox-add-x86-system-adapter.patch
 git apply --check $P
@@ -186,7 +186,7 @@ git apply $P
 
 Откатить:
 
-```
+```bash
 cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0008-blackbox-add-x86-system-adapter.patch
 git apply -R --check $P
@@ -211,7 +211,7 @@ git apply -R $P
 
 Применить (из корня дерева ядра):
 
-```
+```bash
 cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0009-blackbox-read-pstore-record-on-linux-6.6.patch
 git apply --check $P
@@ -220,7 +220,7 @@ git apply $P
 
 Откатить:
 
-```
+```bash
 cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0009-blackbox-read-pstore-record-on-linux-6.6.patch
 git apply -R --check $P
@@ -233,7 +233,7 @@ git apply -R $P
 
 Проверка (QEMU с ramoops, холодный старт → `reboot`):
 
-```
+```bash
 dmesg | grep -i bbox                       # "read /sys/fs/pstore/blackbox-ramoops-0: N bytes", непустые event/module
 ls -lR /data/log/bbox                      # каталог <время>-<номер> с непустым last_kmsg
 head -c 300 /data/log/bbox/*/last_kmsg
