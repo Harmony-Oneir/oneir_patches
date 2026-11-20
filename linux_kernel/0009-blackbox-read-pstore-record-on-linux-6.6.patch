@@ -1,0 +1,64 @@
+blackbox: read the pstore record on linux 6.6
+
+On linux 6.6 the OpenHarmony blackbox does not read the pstore record at
+all. get_log_by_pstore() opens /sys/fs/pstore/blackbox-*, prints "read ...
+is succ", sets g_blackbox_flag, closes and deletes the file, but never
+reads it into the buffer: pbuf/pos are unused and the __error label is
+dead code. The system adapter then takes the version-specific branch
+"if (g_blackbox_flag) return 0;" without filling error_info. As a result
+every fault log is saved with empty event/module/time and an empty
+last_kmsg, and the record itself is deleted.
+
+pstore_blackbox_dump() (fs/pstore/platform.c) writes exactly the format
+the old (5.10) branch of the adapter expects: struct fault_log_info
+(LOG_FLAG, event, module "PSTORE", time, stack, len) followed by kmsg.
+
+- blackbox_storage.c: kernel_read() the record into the buffer; set the
+  flag and delete the record only after a successful read.
+- x86/system_adapter.c: drop the version-specific branch in
+  get_last_log_info() and always parse the header.
+
+The rockchip adapter (from rk3568_patch) has the same problem and is not
+touched here. Requires 0008.
+
+diff --git a/drivers/staging/blackbox/blackbox_storage.c b/drivers/staging/blackbox/blackbox_storage.c
+index 117d05ea4..eef422054 100644
+--- a/drivers/staging/blackbox/blackbox_storage.c
++++ b/drivers/staging/blackbox/blackbox_storage.c
+@@ -146,7 +146,12 @@ static int get_log_by_pstore(void *in, unsigned int inlen)
+ 			return -EBADF;
+ 		}
+ 
+-		printk("bbox %s %d, read %s is succ\n", __func__, __LINE__, getfullpath(filp) ? getfullpath(filp) : "");
++		ret = kernel_read(filp, in, inlen, &pos);
++		if (ret <= 0) {
++			bbox_print_err("read %s failed! ret is [%d]\n", pstore_file, ret);
++			goto __error;
++		}
++		bbox_print_info("read %s: %d bytes\n", pstore_file, ret);
+ 		g_blackbox_flag = true;
+ 
+ 		file_close(filp);
+diff --git a/drivers/staging/blackbox/x86/system_adapter.c b/drivers/staging/blackbox/x86/system_adapter.c
+index fe3a06293..e4d65f493 100644
+--- a/drivers/staging/blackbox/x86/system_adapter.c
++++ b/drivers/staging/blackbox/x86/system_adapter.c
+@@ -178,10 +178,6 @@ static int get_last_log_info(struct error_info *info)
+ 		bbox_print_err("Get last log from strorage failed!\n");
+ 		return -ENOENT;
+ 	}
+-#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+-	if(g_blackbox_flag)
+-		return 0;
+-#else
+ 	down(&kmsg_sem);
+ 	if (!memcmp(pinfo->flag, LOG_FLAG, strlen(LOG_FLAG))) {
+ 		memcpy(info, &pinfo->info, sizeof(*info));
+@@ -195,7 +191,6 @@ static int get_last_log_info(struct error_info *info)
+ 		return 0;
+ 	}
+ 	up(&kmsg_sem);
+-#endif
+ 	bbox_print_info("There's no valid fault log!\n");
+ 
+ 	return -ENOMSG;
