@@ -197,15 +197,22 @@ git apply -R $P
 
 **0009-blackbox-read-pstore-record-on-linux-6.6.patch**
 
-На linux-6.6 blackbox OpenHarmony не читает запись pstore. Функция `get_log_by_pstore()` в `drivers/staging/blackbox/blackbox_storage.c` открывает `/sys/fs/pstore/blackbox-*`, пишет в лог `read ... is succ`, ставит флаг `g_blackbox_flag`, закрывает и удаляет файл, но содержимое в буфер так и не читает. Системный адаптер на 6.6 по этому флагу сообщает «сбой был», но `error_info` не заполняет. В итоге каждый лог сбоя в `/data/log/bbox` сохраняется с пустыми событием, модулем и временем, `last_kmsg` — 0 байт, а сама запись в pstore удаляется.
+**0009-blackbox-read-pstore-record-on-linux-6.6.patch**
+
+На linux-6.6 blackbox OpenHarmony не читает запись pstore: каждый лог сбоя в `/data/log/bbox` сохраняется с пустыми событием, модулем и временем, `last_kmsg` — 0 байт, а сама запись удаляется.
+
+Причина — в pstore. Файлы pstore реализуют только старую операцию `.read`, а `kernel_read()` после удаления `set_fs()` требует `read_iter` и возвращает `-EINVAL` (в dmesg: `kernel read not supported for file /blackbox-ramoops-0`). Вместо исправления при переносе на 6.6 функция `get_log_by_pstore()` в `blackbox_storage.c` превратилась в заглушку: открывает запись, ставит флаг `g_blackbox_flag`, закрывает и удаляет файл, ничего не прочитав. А в системный адаптер добавилась ветка по версии `if (g_blackbox_flag) return 0;`, которая не заполняет `error_info`.
 
 Запись пишет `pstore_blackbox_dump()` (`fs/pstore/platform.c`) ровно в том формате, который ждёт ветка адаптера для 5.10: заголовок `struct fault_log_info` (отметка `LOG_FLAG`, событие, модуль `PSTORE`, время, стек, длина), за ним хвост kmsg.
 
 Патч:
-- в `blackbox_storage.c` возвращает чтение записи (`kernel_read()`); флаг ставится и запись удаляется только после успешного чтения;
-- в `x86/system_adapter.c` убирает ветку по версии ядра в `get_last_log_info()`, чтобы заголовок разбирался всегда.
+- `fs/pstore/inode.c` — `.read` заменён на `.read_iter` с той же логикой (`seq_read_iter()` для ftrace, копирование из буфера записи для остальных), после чего `kernel_read()` работает; чтение из пользовательского пространства не меняется;
+- `blackbox_storage.c` — запись читается в буфер (`kernel_read()`); флаг ставится и запись удаляется только после успешного чтения;
+- `x86/system_adapter.c` — убрана ветка по версии ядра в `get_last_log_info()`, заголовок разбирается всегда.
 
-Адаптер Rockchip (из `rk3568_patch`) содержит ту же ошибку и здесь не меняется.
+Адаптер Rockchip (из `rk3568_patch`) содержит ту же ошибку на стороне адаптера и здесь не меняется.
+
+Проверено в QEMU (q35, GPT-диск по NVMe, ramoops): после `reboot` и `echo c > /proc/sysrq-trigger` в `/data/log/bbox/<время>-<номер>/last_kmsg` появляется лог с событием `PANIC`, модулем `SYSTEM` и стеком паники.
 
 **Требует `0008`.** На чистое ядро накладывать по порядку: `0008`, затем `0009`.
 
