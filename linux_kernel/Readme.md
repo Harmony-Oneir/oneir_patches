@@ -163,6 +163,7 @@ git apply -R $P
 find /mnt/ohos/OpenHarmony7/out/kernel/OBJ/modules -name "*.ko" | head
 ```
 
+---
 
 **0008-blackbox-add-x86-system-adapter.patch**
 
@@ -190,3 +191,50 @@ cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
 P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0008-blackbox-add-x86-system-adapter.patch
 git apply -R --check $P
 git apply -R $P
+
+
+---
+
+**0009-blackbox-read-pstore-record-on-linux-6.6.patch**
+
+На linux-6.6 blackbox OpenHarmony не читает запись pstore. Функция `get_log_by_pstore()` в `drivers/staging/blackbox/blackbox_storage.c` открывает `/sys/fs/pstore/blackbox-*`, пишет в лог `read ... is succ`, ставит флаг `g_blackbox_flag`, закрывает и удаляет файл, но содержимое в буфер так и не читает. Системный адаптер на 6.6 по этому флагу сообщает «сбой был», но `error_info` не заполняет. В итоге каждый лог сбоя в `/data/log/bbox` сохраняется с пустыми событием, модулем и временем, `last_kmsg` — 0 байт, а сама запись в pstore удаляется.
+
+Запись пишет `pstore_blackbox_dump()` (`fs/pstore/platform.c`) ровно в том формате, который ждёт ветка адаптера для 5.10: заголовок `struct fault_log_info` (отметка `LOG_FLAG`, событие, модуль `PSTORE`, время, стек, длина), за ним хвост kmsg.
+
+Патч:
+- в `blackbox_storage.c` возвращает чтение записи (`kernel_read()`); флаг ставится и запись удаляется только после успешного чтения;
+- в `x86/system_adapter.c` убирает ветку по версии ядра в `get_last_log_info()`, чтобы заголовок разбирался всегда.
+
+Адаптер Rockchip (из `rk3568_patch`) содержит ту же ошибку и здесь не меняется.
+
+**Требует `0008`.** На чистое ядро накладывать по порядку: `0008`, затем `0009`.
+
+Применить (из корня дерева ядра):
+
+```
+cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0009-blackbox-read-pstore-record-on-linux-6.6.patch
+git apply --check $P
+git apply $P
+```
+
+Откатить:
+
+```
+cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0009-blackbox-read-pstore-record-on-linux-6.6.patch
+git apply -R --check $P
+git apply -R $P
+```
+
+Откатывать `0008` — только после отката `0009`.
+
+После правки дерева ядра перед сборкой: `touch /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6`, иначе ninja пропустит сборку ядра.
+
+Проверка (QEMU с ramoops, холодный старт → `reboot`):
+
+```
+dmesg | grep -i bbox                       # "read /sys/fs/pstore/blackbox-ramoops-0: N bytes", непустые event/module
+ls -lR /data/log/bbox                      # каталог <время>-<номер> с непустым last_kmsg
+head -c 300 /data/log/bbox/*/last_kmsg
+```
