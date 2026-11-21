@@ -245,3 +245,38 @@ dmesg | grep -i bbox                       # "read /sys/fs/pstore/blackbox-ramoo
 ls -lR /data/log/bbox                      # каталог <время>-<номер> с непустым last_kmsg
 head -c 300 /data/log/bbox/*/last_kmsg
 ```
+
+
+---
+
+**0010-blackbox-x86-automatic-ramoops-region.patch**
+
+Ramoops нужна фиксированная физическая область, обычно задаваемая параметрами `memmap=` и `ramoops.*`. Зашитый в cmdline адрес зависит от железа, а после замены ОЗУ или обновления прошивки может оказаться в области ACPI или прошивки.
+
+Патч добавляет параметр `bbox_ramoops=auto` (`drivers/staging/blackbox/x86/ramoops_auto.c`). На ранней стадии загрузки, после получения карты памяти e820 и до передачи памяти в memblock, ядро само выбирает область 1 МБ по фиксированному правилу: самый большой участок обычной ОЗУ, отступ 256 МБ от его начала, выравнивание 2 МБ. Участок пропускается, если пересекается с образом ядра (KASLR), initrd или `setup_data`; тогда сдвиг на 64 МБ, до 8 попыток. Область резервируется в e820, как `memmap=nn$ss`, и для неё регистрируется устройство `ramoops` (1 МБ, записи по 128 КБ, 256 КБ под blackbox, ECC).
+
+Одна и та же карта памяти даёт один и тот же адрес при каждой загрузке, поэтому записи переживают тёплую перезагрузку. После смены железа или прошивки область переезжает в новую обычную ОЗУ: теряется только запись, сделанная до изменения. Явный `ramoops.mem_address=` в cmdline имеет приоритет.
+
+Один образ для любого железа: в cmdline достаточно `bbox_ramoops=auto panic=5`.
+
+Проверено в QEMU (q35, GPT-диск по NVMe): одинаковый адрес на всех загрузках, после `reboot` и `echo c > /proc/sysrq-trigger` в `/data/log/bbox` логи с событиями `UNKNOWN` и `PANIC`.
+
+**Требует `0008` и `0009`.** Накладывать по порядку `0008` → `0009` → `0010`, откатывать в обратном.
+
+Применить (из корня дерева ядра):
+
+```
+cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0010-blackbox-x86-automatic-ramoops-region.patch
+git apply --check $P
+git apply $P
+```
+
+Откатить:
+
+```
+cd /mnt/ohos/OpenHarmont7/kernel/linux/linux-6.6
+P=/mnt/ohos/OpenHarmont7/oneir/oneir_patches/linux_kernel/0010-blackbox-x86-automatic-ramoops-region.patch
+git apply -R --check $P
+git apply -R $P
+```
